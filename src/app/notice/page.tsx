@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getSession } from '@/lib/auth'
-import { fetchNotifications, markNotificationRead, clearAllNotifications, deleteNotifications } from '@/lib/gist-api'
+import { clearAllNotifications, deleteNotifications, fetchNotifications, markNotificationRead } from '@/lib/api/notifications'
 import { registry } from '@/data/person-registry'
 import { BASE_PATH } from '@/lib/constants'
 import FaIcon from '@/components/FaIcon'
 import { UserName } from '@/components/UserName'
-import type { Notification } from '@/lib/gist-api'
+import type { Notification } from '@/lib/api/notifications'
 import styles from '@/styles/auth.module.css'
 
 export default function NoticePage() {

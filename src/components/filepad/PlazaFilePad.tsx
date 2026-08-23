@@ -28,7 +28,7 @@ import {
   faStar,
   faPlus,
 } from '@fortawesome/free-solid-svg-icons'
-import { fetchPlazaCategories } from '@/lib/gist-api'
+import { fetchPlazaCategories } from '@/lib/api/plaza'
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons'
 import type { PlazaCategory, PlazaCategoryTreeNode } from '@/types/plaza'
 import { buildCategoryTree } from '@/types/plaza'

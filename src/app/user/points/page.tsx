@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSession } from '@/lib/auth'
-import { fetchTodayProgress, fetchPointsHistory } from '@/lib/gist-api'
+import { fetchPointsHistory, fetchTodayProgress } from '@/lib/api/points'
 import type { TodayProgress, PointsTransaction } from '@/types/gist'
 import { POINTS_REASON_LABEL } from '@/types/gist'
 import { formatDate } from '@/lib/forum'

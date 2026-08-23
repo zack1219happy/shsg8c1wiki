@@ -13,7 +13,8 @@ import {
   faNewspaper,
   faCoins,
 } from '@fortawesome/free-solid-svg-icons'
-import { getUnreadDmCount, getUnreadCount } from '@/lib/gist-api'
+import { getUnreadDmCount } from '@/lib/api/dm'
+import { getUnreadCount } from '@/lib/api/notifications'
 import { getSession } from '@/lib/auth'
 import styles from '@/styles/sidebar.module.css'
 

@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import FaIcon from '@/components/FaIcon'
 import { renderMarkdown } from '@/lib/markdown'
 import { getSession } from '@/lib/auth'
-import { fetchPlazaArticles, fetchPlazaCategories } from '@/lib/gist-api'
+import { fetchPlazaArticles, fetchPlazaCategories } from '@/lib/api/plaza'
+import { formatDate } from '@/lib/forum'
 import type { PlazaArticleListResult, PlazaCategory } from '@/types/plaza'
 import { UserName } from '@/components/UserName'
 import styles from '@/styles/forum.module.css'
@@ -171,16 +172,3 @@ function ArticleCard({ article, onClick }: { article: PlazaArticleListResult; on
   )
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return '刚刚'
-  if (mins < 60) return `${mins} 分钟前`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs} 小时前`
-  const days = Math.floor(hrs / 24)
-  if (days < 30) return `${days} 天前`
-  return d.toLocaleDateString('zh-CN')
-}

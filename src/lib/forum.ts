@@ -2,6 +2,15 @@
  * 论坛共享工具函数
  */
 
+/** 短日期（MM-DD），用于列表卡片与关注日期 */
+export function formatDateShort(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${mm}-${dd}`
+}
+
 export function formatDate(iso: string): string {
   try {
     const d = new Date(iso)

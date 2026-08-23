@@ -7,14 +7,8 @@ import FaIcon from '@/components/FaIcon'
 import WikiContent from '@/components/WikiContent'
 import { renderMarkdown } from '@/lib/markdown'
 import { getSession } from '@/lib/auth'
-import {
-    fetchForumPost,
-    voteForumPost,
-    removeForumVote,
-    getUserForumVote,
-    updateForumPost,
-    fetchAllUsers,
-} from '@/lib/gist-api'
+import { fetchForumPost, getUserForumVote, removeForumVote, updateForumPost, voteForumPost } from '@/lib/api/forum'
+import { fetchAllUsers } from '@/lib/api/users'
 import CommentSection from '@/components/CommentSection'
 import VisibilityBar from '@/components/VisibilityBar'
 import VisibilityModal from '@/components/VisibilityModal'

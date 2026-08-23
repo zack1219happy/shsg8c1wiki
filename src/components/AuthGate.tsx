@@ -10,7 +10,8 @@ import {
   type UserSession,
 } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-import { getUnreadCount, getUnreadDmCount } from '@/lib/gist-api'
+import { getUnreadDmCount } from '@/lib/api/dm'
+import { getUnreadCount } from '@/lib/api/notifications'
 import styles from '@/styles/auth.module.css'
 import FaIcon from '@/components/FaIcon'
 import { UserColorProvider } from '@/lib/user-colors'

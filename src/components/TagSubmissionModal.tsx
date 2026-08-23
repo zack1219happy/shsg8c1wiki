@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { submitTagSubmission } from '@/lib/gist-api'
+import { submitTagSubmission } from '@/lib/api/shop'
 import forumStyles from '@/styles/forum.module.css'
 
 /**

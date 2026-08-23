@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import FaIcon from '@/components/FaIcon'
-import { fetchAllWishes } from '@/lib/gist-api'
+import { fetchAllWishes } from '@/lib/api/wishes'
 import type { WishItem } from '@/types/wishes'
 import { WISH_STATUS_MAP, WISH_TIER_MAP, WISH_TIER_OPTIONS } from '@/types/wishes'
 import { UserName } from '@/components/UserName'

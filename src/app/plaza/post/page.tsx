@@ -7,22 +7,8 @@ import FaIcon from '@/components/FaIcon'
 import WikiContent from '@/components/WikiContent'
 import { renderMarkdown, createMarkdown, extractHeadingsFromHtml, type Heading } from '@/lib/markdown'
 import { getSession, type UserSession } from '@/lib/auth'
-import {
-    fetchPlazaArticle,
-    deletePlazaArticle,
-    updatePlazaArticle,
-    votePlazaArticle,
-    removePlazaVote,
-    getUserPlazaVote,
-    fetchPlazaCategories,
-    awardPlazaArticlePoints,
-    tipPlazaArticle,
-    fetchMyPoints,
-    sendPlazaPoints,
-    fetchPlazaArticleTips,
-    getPlazaStorage,
-    setPlazaStorage,
-} from '@/lib/gist-api'
+import { awardPlazaArticlePoints, deletePlazaArticle, fetchPlazaArticle, fetchPlazaArticleTips, fetchPlazaCategories, getPlazaStorage, getUserPlazaVote, removePlazaVote, sendPlazaPoints, setPlazaStorage, tipPlazaArticle, updatePlazaArticle, votePlazaArticle } from '@/lib/api/plaza'
+import { fetchMyPoints } from '@/lib/api/points'
 import { formatDate } from '@/lib/forum'
 import { loadPinyinInitialsFromDB } from '@/lib/people'
 import TableOfContents from '@/components/TableOfContents'

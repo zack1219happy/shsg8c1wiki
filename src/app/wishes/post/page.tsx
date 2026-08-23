@@ -5,10 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import FaIcon from '@/components/FaIcon'
 import { getSession } from '@/lib/auth'
 import type { UserSession } from '@/lib/auth'
-import {
-  fetchWishById,
-  updateWishStatus,
-} from '@/lib/gist-api'
+import { fetchWishById, updateWishStatus } from '@/lib/api/wishes'
 import type { WishItem } from '@/types/wishes'
 import { WISH_STATUS_MAP, WISH_TIER_MAP } from '@/types/wishes'
 import CommentSection from '@/components/CommentSection'

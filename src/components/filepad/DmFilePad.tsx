@@ -3,12 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSession } from '@/lib/auth'
-import {
-  getConversations,
-  getUnreadDmCount,
-  fetchAllUsers,
-  type Conversation,
-} from '@/lib/gist-api'
+import { Conversation, getConversations, getUnreadDmCount } from '@/lib/api/dm'
+import { fetchAllUsers } from '@/lib/api/users'
 import type { UserInfo } from '@/types/gist'
 import { getPinyinInitials } from '@/lib/people'
 import FaIcon from '@/components/FaIcon'

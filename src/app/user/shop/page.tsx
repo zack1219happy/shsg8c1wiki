@@ -4,15 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import FaIcon from '@/components/FaIcon'
 import { getSession } from '@/lib/auth'
-import {
-  fetchShopItems,
-  fetchUserPurchases,
-  purchaseItem,
-  fetchMyPoints,
-  fetchTagSubmissions,
-  approveTagSubmission,
-  rejectTagSubmission,
-} from '@/lib/gist-api'
+import { fetchMyPoints } from '@/lib/api/points'
+import { approveTagSubmission, fetchShopItems, fetchTagSubmissions, fetchUserPurchases, purchaseItem, rejectTagSubmission } from '@/lib/api/shop'
 import type { ShopItem, TagSubmission } from '@/types/gist'
 import TagSubmissionModal from '@/components/TagSubmissionModal'
 import styles from '@/styles/points.module.css'
