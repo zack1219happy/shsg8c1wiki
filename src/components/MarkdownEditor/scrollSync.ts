@@ -2,7 +2,7 @@
    MarkdownEditor — Scroll Sync 工具
 
    注意：injectLnParser 和 createPreviewMd 已迁移至
-   src/lib/render-client.ts，预览渲染统一由 renderClient 完成。
+   src/lib/markdown.ts，预览渲染统一由 renderMarkdown 完成。
    ============================================ */
 
 /**

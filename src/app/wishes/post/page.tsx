@@ -17,6 +17,7 @@ import { UserName } from '@/components/UserName'
 import { showWarningToast } from '@/lib/toast'
 import { formatDate } from '@/lib/forum'
 import styles from '@/styles/forum.module.css'
+import pd from '@/styles/post-detail.module.css'
 
 /* ==============================================================
    许愿池详情页 — 查看需求详情、状态、评论
@@ -134,28 +135,28 @@ export default function WishPostPage() {
   return (
     <>
       {/* ── 灰色衬底 header（对齐文章广场 detailHeader） ── */}
-      <div className={styles.detailHeader}>
-        <div className={styles.detailHeaderInner}>
-          <div className={styles.detailTitleRow}>
-            <h1 className={styles.detailTitle}>
+      <div className={pd.detailHeader}>
+        <div className={pd.detailHeaderInner}>
+          <div className={pd.detailTitleRow}>
+            <h1 className={pd.detailTitle}>
               #{String(wish.request_number).padStart(4, '0')}
             </h1>
             <div style={{ display: 'flex', gap: 4 }}>
               {isAdmin && !editingStatus && (
-                <button className={styles.backBtnIcon} onClick={startEditStatus} title="编辑进度">
+                <button className={pd.backBtnIcon} onClick={startEditStatus} title="编辑进度">
                   <FaIcon name="pen" />
                 </button>
               )}
-              <button className={styles.backBtnIcon} onClick={() => router.push('/wishes')} title="返回列表">
+              <button className={pd.backBtnIcon} onClick={() => router.push('/wishes')} title="返回列表">
                 <FaIcon name="chevron-left" />
               </button>
             </div>
           </div>
-          <div className={styles.detailMeta}>
+          <div className={pd.detailMeta}>
             {wish.author_username ? (
-              <UserName username={wish.author_username} userId={wish.user_id} className={styles.detailAuthor} />
+              <UserName username={wish.author_username} userId={wish.user_id} className={pd.detailAuthor} />
             ) : (
-              <span className={styles.detailAuthor} style={{ color: 'var(--color-text-light)' }}>匿名</span>
+              <span className={pd.detailAuthor} style={{ color: 'var(--color-text-light)' }}>匿名</span>
             )}
             <span>提交于 {formatDate(wish.created_at)}</span>
           </div>
@@ -164,7 +165,7 @@ export default function WishPostPage() {
 
       {/* ── 无衬底详情 ── */}
       <div className={styles.page} style={{ paddingTop: 0 }}>
-        <div className={styles.detail}>
+        <div className={pd.detail}>
           {/* 标签行 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
             <span style={{
@@ -220,7 +221,7 @@ export default function WishPostPage() {
           )}
 
           {/* 描述 */}
-          <div className={styles.detailBody} style={{ marginTop: 12 }}>
+          <div className={pd.detailBody} style={{ marginTop: 12 }}>
             <WikiContent content={wish.description} className="wiki-body" />
           </div>
 
@@ -306,7 +307,7 @@ export default function WishPostPage() {
           )}
 
           {/* 分割线 → 讨论 */}
-          <div className={styles.voteBar} style={{ borderBottom: '1px solid var(--color-border)', padding: '0 0 0' }} />
+          <div className={pd.voteBar} style={{ borderBottom: '1px solid var(--color-border)', padding: '0 0 0' }} />
 
           <CommentSection source="wish" targetId={wish.id} title="讨论" />
         </div>

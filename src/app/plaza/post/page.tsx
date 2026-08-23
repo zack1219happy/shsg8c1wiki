@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import FaIcon from '@/components/FaIcon'
 import WikiContent from '@/components/WikiContent'
-import { renderClient, createClientMd } from '@/lib/render-client'
+import { renderMarkdown, createMarkdown } from '@/lib/markdown'
 import { getSession, type UserSession } from '@/lib/auth'
 import {
   fetchPlazaArticle,
@@ -33,8 +33,9 @@ import { UserName } from '@/components/UserName'
 import { showWarningToast } from '@/lib/toast'
 import JSSafetyDialog from '@/components/JSSafetyDialog'
 import { useAutoSave, loadDraft } from '@/hooks/useAutoSave'
-import { extractHeadingsFromHtml } from '@/lib/plaza-headings'
+import { extractHeadingsFromHtml } from '@/lib/markdown'
 import styles from '@/styles/forum.module.css'
+import pd from '@/styles/post-detail.module.css'
 import pointsStyles from '@/styles/points.module.css'
 
 const MarkdownEditor = dynamic(
@@ -372,7 +373,7 @@ export default function PlazaArticlePage() {
   const articleHtml = useMemo(() => {
     if (!article?.content) return ''
     try {
-      const md = createClientMd({ highlight: true, texmath: true, anchor: true })
+      const md = createMarkdown({ highlight: true, texmath: true, anchor: true })
       return md.render(article.content)
     } catch { return '' }
   }, [article])
@@ -390,10 +391,10 @@ export default function PlazaArticlePage() {
   return (
     <>
       {/* TOC 可见时右侧让位，标题栏与正文在剩余窗口居中（同 wiki 的 page-content 方案） */}
-      <div className={styles.tocWrap}>
-      <div className={styles.detailHeader}>
-        <div className={styles.detailHeaderInner}>
-          <div className={styles.detailTitleRow}>
+      <div className={pd.tocWrap}>
+      <div className={pd.detailHeader}>
+        <div className={pd.detailHeaderInner}>
+          <div className={pd.detailTitleRow}>
             {editing ? (
               <input
                 className={styles.titleInput}
@@ -404,8 +405,8 @@ export default function PlazaArticlePage() {
                 autoFocus
               />
             ) : (
-              <h1 className={styles.detailTitle}>
-                <span dangerouslySetInnerHTML={{ __html: renderClient(article.title) }} />
+              <h1 className={pd.detailTitle}>
+                <span dangerouslySetInnerHTML={{ __html: renderMarkdown(article.title) }} />
                 {isAdmin && article.is_awarded && (
                   <span style={{ fontSize: '0.8rem', opacity: 0.45, marginLeft: 8 }}>
                     🏅
@@ -416,11 +417,11 @@ export default function PlazaArticlePage() {
             <div style={{ display: 'flex', gap: 4 }}>
               {isAuthor && !editing && (
                 <>
-                  <button className={styles.backBtnIcon} onClick={startEdit} title="编辑文章">
+                  <button className={pd.backBtnIcon} onClick={startEdit} title="编辑文章">
                     <FaIcon name="pen" />
                   </button>
                   <button
-                    className={styles.backBtnIcon}
+                    className={pd.backBtnIcon}
                     onClick={handleDelete}
                     title="删除文章"
                     style={{ color: '#dc2626' }}
@@ -431,7 +432,7 @@ export default function PlazaArticlePage() {
               )}
               {isAdmin && !editing && (
                 <button
-                  className={styles.backBtnIcon}
+                  className={pd.backBtnIcon}
                   onClick={() => { setShowAwardModal(true); setAwardResult(null) }}
                   title="奖励积分"
                 >
@@ -440,7 +441,7 @@ export default function PlazaArticlePage() {
               )}
               {hasJs && jsMode && !editing && (
                 <button
-                  className={styles.backBtnIcon}
+                  className={pd.backBtnIcon}
                   onClick={toggleJsMode}
                   title={jsMode === 'js' ? 'JS 模式（点击切换到安全模式）' : '安全模式（点击切换到原文）'}
                   style={{
@@ -452,7 +453,7 @@ export default function PlazaArticlePage() {
                 </button>
               )}
               <button
-                className={styles.backBtnIcon}
+                className={pd.backBtnIcon}
                 onClick={editing ? cancelEdit : () => router.push('/plaza')}
                 title={editing ? '取消编辑' : '返回列表'}
               >
@@ -460,8 +461,8 @@ export default function PlazaArticlePage() {
               </button>
             </div>
           </div>
-          <div className={styles.detailMeta}>
-            <UserName username={article.author_username} userId={article.author_id} className={styles.detailAuthor} />
+          <div className={pd.detailMeta}>
+            <UserName username={article.author_username} userId={article.author_id} className={pd.detailAuthor} />
             <span>发布于 {formatDate(article.created_at)}</span>
             {article.updated_at !== article.created_at && (
               <span>编辑于 {formatDate(article.updated_at)}</span>
@@ -557,22 +558,22 @@ export default function PlazaArticlePage() {
             </div>
           </div>
         ) : (
-          <div className={styles.detail}>
-            <div className={styles.detailBody}>
+          <div className={pd.detail}>
+            <div className={pd.detailBody}>
               <WikiContent content={article.content} className="wiki-body" noSanitize={jsMode === 'js'} format="markdown" />
             </div>
 
             {/* 点赞栏 */}
-            <div className={styles.voteBar}>
-              <button className={`${styles.voteIcon} ${myVote === 'up' ? styles.voteIconActiveUp : ''}`}
+            <div className={pd.voteBar}>
+              <button className={`${pd.voteIcon} ${myVote === 'up' ? pd.voteIconActiveUp : ''}`}
                 onClick={() => handleVote('up')} title="赞"><FaIcon name="thumbs-up" /></button>
-              <span className={`${styles.voteCount} ${(article.like_count ?? 0) > 0 ? styles.voteCountPositive : ''}`}>{article.like_count ?? 0}</span>
-              <button className={`${styles.voteIcon} ${myVote === 'down' ? styles.voteIconActiveDown : ''}`}
+              <span className={`${pd.voteCount} ${(article.like_count ?? 0) > 0 ? pd.voteCountPositive : ''}`}>{article.like_count ?? 0}</span>
+              <button className={`${pd.voteIcon} ${myVote === 'down' ? pd.voteIconActiveDown : ''}`}
                 onClick={() => handleVote('down')} title="踩"><FaIcon name="thumbs-down" /></button>
-              <span className={`${styles.voteCount} ${(article.downvote_count ?? 0) > 0 ? styles.voteCountNegative : ''}`}>{article.downvote_count ?? 0}</span>
+              <span className={`${pd.voteCount} ${(article.downvote_count ?? 0) > 0 ? pd.voteCountNegative : ''}`}>{article.downvote_count ?? 0}</span>
               {session && !editing && (
                 <button
-                  className={styles.voteIcon}
+                  className={pd.voteIcon}
                   onClick={isAuthor ? undefined : () => { setShowTipModal(true); setTipResult(null); setTipCustom(false) }}
                   title="投币"
                   style={{ opacity: isAuthor ? 0.4 : 1, cursor: isAuthor ? 'default' : 'pointer' }}
@@ -580,7 +581,7 @@ export default function PlazaArticlePage() {
                   <FaIcon name="coins" />
                 </button>
               )}
-              <span className={styles.voteCount}>{article.tip_count ?? 0}</span>
+              <span className={pd.voteCount}>{article.tip_count ?? 0}</span>
             </div>
 
             {/* 评论区 */}

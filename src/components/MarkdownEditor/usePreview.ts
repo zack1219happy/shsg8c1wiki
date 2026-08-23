@@ -5,7 +5,7 @@
 'use client'
 
 import { useRef, useMemo, useEffect } from 'react'
-import { renderClientWithRegistry, replaceWikiLinks } from '@/lib/render-client'
+import { renderMarkdownWithRegistry, replaceWikiLinks } from '@/lib/markdown'
 import { registry, titleSlugMap as defaultTitleSlugMap } from '@/data/person-registry'
 import { BASE_PATH } from '@/lib/constants'
 import { getPreviewLineAtTop } from './scrollSync'
@@ -50,7 +50,7 @@ export function usePreview({
 
   // 通过 render-client 统一渲染（开启 highlight + texmath + injectLn）
   const previewHtml = useMemo(() => {
-    const raw = renderClientWithRegistry(content, registry, { highlight: true, texmath: true, injectLn: true }, !noSanitize)
+    const raw = renderMarkdownWithRegistry(content, registry, { highlight: true, texmath: true, injectLn: true }, !noSanitize)
     // 渲染 [[Wiki 链接]]
     const withLinks = replaceWikiLinks(raw, effectiveMap, basePath)
     // 处理 ```sandbox 块

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { Heading } from '@/lib/content'
+import type { Heading } from '@/lib/markdown'
 import TableOfContents from './TableOfContents'
 
 interface Props {

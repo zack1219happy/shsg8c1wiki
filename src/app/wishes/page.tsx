@@ -7,7 +7,7 @@ import { fetchAllWishes } from '@/lib/gist-api'
 import type { WishItem } from '@/types/wishes'
 import { WISH_STATUS_MAP, WISH_TIER_MAP, WISH_TIER_OPTIONS } from '@/types/wishes'
 import { UserName } from '@/components/UserName'
-import { stripMarkdown } from '@/lib/render-client'
+import { stripMarkdown } from '@/lib/markdown'
 import wishStyles from '@/styles/wishes.module.css'
 
 /* ==============================================================

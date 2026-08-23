@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import type { Heading } from '@/lib/content'
+import type { Heading } from '@/lib/markdown'
 import FaIcon from '@/components/FaIcon'
 import styles from '@/styles/toc.module.css'
 

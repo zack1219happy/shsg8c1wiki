@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
-import AgreementContentDB from '@/components/AgreementContentDB'
+import ContentDB from '@/components/ContentDB'
 import TableOfContents from '@/components/TableOfContents'
-import { renderMarkdownAndGetHeadings, type Heading } from '@/lib/content'
+import { renderMarkdownAndGetHeadings } from '@/lib/content'
+import type { Heading } from '@/lib/markdown'
 import { supabase } from '@/lib/supabase'
 
 interface Props {
@@ -95,7 +96,8 @@ export default async function AgreementPage({ params }: Props) {
           flex: 1,
         }}
       >
-        <AgreementContentDB
+        <ContentDB
+          variant="agreement"
           slug={slugPath}
           staticContent={staticContent.rawContent}
           staticTitle={staticContent.title}

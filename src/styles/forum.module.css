@@ -1,19 +1,17 @@
 /* ============================================
    讨论区 (Forum) 样式
    ============================================ */
-
-/* ---- 容器 ---- */
 .page {
   max-width: 860px;
   margin: 0 auto;
   padding: 76px 24px 60px;
   animation: fadeInUp 0.2s ease-out;
 }
-
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
 
 .header {
   display: flex;
@@ -21,6 +19,7 @@
   justify-content: space-between;
   margin-bottom: 24px;
 }
+
 
 .header h2 {
   font-size: 1.5rem;
@@ -31,12 +30,11 @@
   gap: 10px;
 }
 
+
 .headerActions {
   display: flex;
   gap: 8px;
 }
-
-/* ---- 通用按钮 ---- */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -52,17 +50,21 @@
   color: #fff;
 }
 
+
 .btn:active {
   transform: scale(0.96);
 }
+
 
 .btnPrimary {
   background: var(--color-primary);
 }
 
+
 .btnPrimary:hover {
   background: var(--color-primary-hover);
 }
+
 
 .btnOutline {
   background: transparent;
@@ -70,11 +72,10 @@
   color: var(--color-text-secondary);
 }
 
+
 .btnOutline:hover {
   background: var(--color-hover-bg);
 }
-
-/* ---- 搜索图标切换按钮 ---- */
 .searchToggle {
   background: none;
   border: none;
@@ -86,33 +87,27 @@
   transition: background-color 0.15s, color 0.15s, transform 0.15s;
 }
 
+
 .searchToggle:hover {
   background: var(--color-hover-bg);
   color: var(--color-text);
 }
 
+
 .searchToggle:active {
   transform: scale(0.96);
 }
+
 
 .searchToggleActive {
   color: var(--color-primary);
 }
 
-.btnDanger {
-  background: #dc2626;
-}
-
-.btnDanger:hover {
-  background: #b91c1c;
-}
 
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
-/* ---- 搜索栏 ---- */
 .searchBar {
   display: flex;
   align-items: center;
@@ -124,11 +119,13 @@
   background: var(--color-bg);
 }
 
+
 .searchIcon {
   color: var(--color-text-light);
   font-size: 0.9rem;
   flex-shrink: 0;
 }
+
 
 .searchInput {
   flex: 1;
@@ -139,9 +136,11 @@
   color: var(--color-text);
 }
 
+
 .searchInput::placeholder {
   color: var(--color-text-light);
 }
+
 
 .searchCount {
   font-size: 0.78rem;
@@ -149,13 +148,12 @@
   white-space: nowrap;
   margin-left: auto;
 }
-
-/* ---- 帖子列表 ---- */
 .list {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+
 
 .postCard {
   display: block;
@@ -169,16 +167,15 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
 }
 
+
 .postCard:hover {
   box-shadow: 0 2px 12px rgba(26, 115, 232, 0.12), 0 0 0 1px rgba(26, 115, 232, 0.15);
   transform: translateY(-1px);
 }
-
-/* ---- 置顶区域 ---- */
-
 .pinnedSection {
   margin-bottom: 4px;
 }
+
 
 .pinnedHeader {
   display: flex;
@@ -193,28 +190,23 @@
   border-radius: var(--border-radius) var(--border-radius) 0 0;
 }
 
+
 .pinnedHeader:hover {
   color: var(--color-text-secondary);
 }
+
 
 .postCardPinned {
   background: rgba(255, 215, 0, 0.035);
   box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(255, 215, 0, 0.07);
 }
 
+
 .postCardPinned:hover {
   box-shadow: 0 2px 10px rgba(255, 215, 0, 0.09), 0 0 0 1px rgba(255, 215, 0, 0.12);
   transform: translateY(-1px);
 }
 
-.postMetaRight {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 0.82rem;
-  color: var(--color-text-light);
-  justify-content: flex-end;
-}
 
 .postTitle {
   font-size: 1.05rem;
@@ -224,9 +216,11 @@
   line-height: 1.4;
 }
 
+
 .postTitle p {
   margin: 0;
 }
+
 
 .postMeta {
   display: flex;
@@ -236,10 +230,12 @@
   color: var(--color-text-light);
 }
 
+
 .postAuthor {
   font-weight: 500;
   color: var(--color-text-secondary);
 }
+
 
 .postStats {
   display: flex;
@@ -247,6 +243,7 @@
   gap: 8px;
   margin-left: auto;
 }
+
 
 .statBadge {
   display: inline-flex;
@@ -256,9 +253,11 @@
   color: var(--color-text-muted);
 }
 
+
 .statBadgeUpvoted {
   color: var(--color-primary);
 }
+
 
 .empty {
   text-align: center;
@@ -267,6 +266,7 @@
   font-size: 0.9rem;
 }
 
+
 .loading, .error {
   text-align: center;
   padding: 40px;
@@ -274,11 +274,10 @@
   font-size: 0.9rem;
 }
 
+
 .error {
   color: #dc2626;
 }
-
-/* ---- 重复内容警告 ---- */
 .dupWarning {
   position: fixed;
   inset: 0;
@@ -288,6 +287,7 @@
   justify-content: center;
   z-index: 1000;
 }
+
 .dupWarningContent {
   background: var(--color-bg-primary);
   border-radius: var(--border-radius-lg);
@@ -298,9 +298,11 @@
   flex-direction: column;
   gap: 12px;
 }
+
 .dupWarningContent p {
   margin: 0;
 }
+
 .dupWarningActions {
   display: flex;
   gap: 8px;
@@ -308,309 +310,6 @@
   margin-top: 8px;
 }
 
-/* ---- 帖子详情 ---- */
-.detail {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.detailHeader {
-  background: var(--color-sidebar-bg);
-  width: 100%;
-  margin-bottom: 20px;
-  padding: 60px 0 24px;
-  border-bottom: 1px solid var(--color-border);
-  box-sizing: border-box;
-}
-
-.detailHeaderInner {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-.detailTitleRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.detailTitle {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text);
-  line-height: 1.3;
-  margin-bottom: 8px;
-}
-
-.detailTitle p {
-  margin: 0;
-  display: inline;
-}
-
-.detailMeta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 0.85rem;
-  color: var(--color-text-light);
-  flex-wrap: wrap;
-}
-
-.detailAuthor {
-  font-weight: 600;
-}
-
-.backBtnIcon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-text-light);
-  font-size: 1.2rem;
-  padding: 4px 8px;
-  border-radius: var(--border-radius);
-  flex-shrink: 0;
-  margin-top: 4px;
-  transition: background 0.15s;
-}
-
-.backBtnIcon:hover {
-  background: var(--color-hover-bg);
-  color: var(--color-text);
-}
-
-.detailBody {
-  font-size: 0.95rem;
-  line-height: 1.7;
-  color: var(--color-text-secondary);
-  padding: 0 0 8px;
-}
-
-/* ---- 投票栏 — 纯图标横排 ---- */
-.voteBar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 0 16px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.voteIcon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-text-light);
-  font-size: 1rem;
-  padding: 8px 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.15s;
-  border-radius: var(--border-radius);
-}
-
-.voteIcon:hover {
-  background: var(--color-hover-bg);
-}
-
-.voteIconActiveUp {
-  color: var(--color-primary) !important;
-}
-
-.voteIconActiveDown {
-  color: #dc2626 !important;
-}
-
-.voteCount {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  min-width: 16px;
-  text-align: center;
-  margin-right: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.voteCount:last-child {
-  margin-right: 0;
-}
-
-.voteCountPositive {
-  color: var(--color-primary);
-}
-
-.voteCountNegative {
-  color: #dc2626;
-}
-
-/* ---- 评论区（论坛内） ---- */
-.commentSection {
-  margin-top: 0;
-}
-
-.commentSectionTitle {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 8px;
-  margin-right: auto;
-}
-
-.commentSectionHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.refreshBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  padding: 4px;
-  font-size: 0.82rem;
-  color: var(--color-text-light);
-  cursor: pointer;
-  transition: color 0.2s;
-  line-height: 1;
-}
-
-.refreshBtn:hover:not(:disabled) {
-  color: var(--color-primary);
-}
-
-.refreshBtn:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.refreshBtnCooling {
-  color: var(--color-primary);
-}
-
-.refreshCooldown {
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  min-width: 1.6em;
-  text-align: center;
-}
-
-.commentForm {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.commentEditor {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  overflow: hidden;
-}
-
-.commentEditor .commentEditorInner {
-  border: none !important;
-  border-radius: 0 !important;
-  height: 200px;
-}
-
-.commentSubmitRow {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.replyTag {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: var(--color-active-bg);
-  border-radius: var(--border-radius);
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-}
-
-.replyTag strong {
-  color: var(--color-text);
-}
-
-.replyTagClose {
-  margin-left: auto;
-  background: none;
-  border: none;
-  font-size: 1rem;
-  cursor: pointer;
-  color: var(--color-text-light);
-  line-height: 1;
-  padding: 2px 4px;
-  border-radius: var(--border-radius);
-}
-
-.replyTagClose:hover {
-  background: var(--color-hover-bg);
-  color: var(--color-text);
-}
-
-/* ---- 帖子评论列表 ---- */
-.commentList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.commentTopGroup {
-  /* 顶层评论 + 其回复的容器 */
-}
-
-.commentCard {
-  padding: 10px 0;
-}
-
-.commentDeleted {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-.commentMeta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-  font-size: 0.82rem;
-  border-radius: var(--border-radius);
-  transition: background 0.12s;
-}
-
-.commentMeta:hover {
-  background: var(--color-toc-bg);
-}
-
-.commentAuthor {
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.commentDate {
-  color: var(--color-text-light);
-  margin-left: auto;
-}
-
-.commentBody {
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: var(--color-text-secondary);
-  white-space: pre-wrap;
-  word-break: break-word;
-  padding: 4px 0;
-  border-radius: var(--border-radius);
-  transition: background 0.12s;
-}
 
 
 .commentReplies {
@@ -622,89 +321,12 @@
   flex-direction: column;
   gap: 2px;
 }
-
-.unifiedReply {
-  padding: 6px 0;
-}
-
-.replyMeta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 2px;
-  font-size: 0.8rem;
-  border-radius: var(--border-radius);
-  transition: background 0.12s;
-}
-
-.replyMeta:hover {
-  background: var(--color-toc-bg);
-}
-
-.replyAuthor {
-  font-weight: 600;
-  color: var(--color-text);
-  white-space: nowrap;
-}
-
-.replyVerb {
-  color: var(--color-text-light);
-  font-size: 0.78rem;
-}
-
-.replyTarget {
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
-.replyDate {
-  color: var(--color-text-light);
-  font-size: 0.78rem;
-  margin-left: auto;
-}
-
-.replyContent {
-  font-size: 0.88rem;
-  line-height: 1.6;
-  color: var(--color-text-secondary);
-  white-space: pre-wrap;
-  word-break: break-word;
-  padding: 2px 0;
-  border-radius: var(--border-radius);
-  transition: background 0.12s;
-}
-
-
-.deleteBtn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-text-light);
-  opacity: 0;
-  transition: opacity 0.15s;
-  padding: 2px;
-  border-radius: var(--border-radius);
-  display: inline-flex;
-  align-items: center;
-}
-
-.commentMeta:hover .deleteBtn,
-.replyMeta:hover .deleteBtn {
-  opacity: 1;
-}
-
-.deleteBtn:hover {
-  color: #dc2626;
-  background: var(--color-hover-bg);
-}
-
-/* ---- 发帖表单 ---- */
 .newPostForm {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
+
 
 .titleInput {
   width: 100%;
@@ -718,10 +340,12 @@
   transition: border-color 0.15s;
 }
 
+
 .titleInput:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
 }
+
 
 .editorWrapper {
   flex: 1;
@@ -733,21 +357,18 @@
   border-radius: var(--border-radius);
   overflow: hidden;
 }
-
-/* 覆写 MarkdownEditor 内层默认边框——外层已负责 */
 .editorWrapper .editorNoBorder {
   border: none !important;
   border-radius: 0 !important;
   height: 420px;
 }
 
+
 .formActions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
-
-/* ---- 可见性标签栏 ---- */
 .visibilityBar {
   display: flex;
   align-items: center;
@@ -756,12 +377,14 @@
   flex-wrap: wrap;
 }
 
+
 .visibilityLabel {
   font-size: 0.82rem;
   color: var(--color-text-secondary);
   font-weight: 500;
   white-space: nowrap;
 }
+
 
 .visibilityTags {
   display: flex;
@@ -771,6 +394,7 @@
   flex: 1;
 }
 
+
 .visibilityTagAll {
   font-size: 0.82rem;
   color: var(--color-text-light);
@@ -778,6 +402,7 @@
   background: var(--color-toc-bg, rgba(0,0,0,0.03));
   border-radius: var(--border-radius);
 }
+
 
 .visibilityTag {
   display: inline-flex;
@@ -790,6 +415,7 @@
   border-radius: var(--border-radius);
   white-space: nowrap;
 }
+
 
 .visibilityTagRemove {
   background: none;
@@ -807,9 +433,11 @@
   height: 16px;
 }
 
+
 .visibilityTagRemove:hover {
   background: rgba(185, 28, 28, 0.15);
 }
+
 
 .visibilityAddBtn {
   background: none;
@@ -823,21 +451,22 @@
   white-space: nowrap;
 }
 
+
 .visibilityAddBtn:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
 
+
 .visibilityAddBtn:active {
   transform: scale(0.96);
 }
-
-/* ---- agent 可见性开关 ---- */
 .visibilitySection {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
+
 
 .agentVisibilityRow {
   display: flex;
@@ -846,15 +475,15 @@
   padding: 2px 0;
 }
 
+
 .toggleAgentOff {
   background: #9ca3af !important;
 }
 
+
 .toggleAgentOff .toggleSlider {
   transform: translateX(18px);
 }
-
-/* ---- 模态框（可见性选择） ---- */
 .modalOverlay {
   position: fixed;
   inset: 0;
@@ -865,11 +494,11 @@
   z-index: 1000;
   animation: fadeIn 0.15s ease-out;
 }
-
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
 
 .visibilityModal {
   background: var(--color-bg, #fff);
@@ -882,11 +511,11 @@
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
   animation: slideUp 0.2s ease-out;
 }
-
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
 
 .visibilityModalHeader {
   display: flex;
@@ -895,12 +524,14 @@
   padding: 16px 20px 8px;
 }
 
+
 .visibilityModalHeader h3 {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-text);
 }
+
 
 .visibilityModalClose {
   background: none;
@@ -913,14 +544,17 @@
   line-height: 1;
 }
 
+
 .visibilityModalClose:hover {
   background: var(--color-hover-bg);
   color: var(--color-text);
 }
 
+
 .visibilityModalSearch {
   padding: 8px 20px;
 }
+
 
 .visibilityModalSearch input {
   width: 100%;
@@ -934,9 +568,11 @@
   box-sizing: border-box;
 }
 
+
 .visibilityModalSearch input:focus {
   border-color: var(--color-primary);
 }
+
 
 .visibilityModalList {
   flex: 1;
@@ -944,6 +580,7 @@
   padding: 4px 20px 12px;
   max-height: 50vh;
 }
+
 
 .visibilityModalItem {
   display: flex;
@@ -955,9 +592,11 @@
   user-select: none;
 }
 
+
 .visibilityModalItem:last-child {
   border-bottom: none;
 }
+
 
 .visibilityModalName {
   display: flex;
@@ -968,6 +607,7 @@
   font-weight: 500;
 }
 
+
 .visibilityModalInitials {
   font-size: 0.75rem;
   color: var(--color-text-light);
@@ -976,12 +616,14 @@
   padding-left: 8px;
 }
 
+
 .visibilityModalEmpty {
   text-align: center;
   padding: 24px;
   color: var(--color-text-light);
   font-size: 0.85rem;
 }
+
 
 .visibilityModalFooter {
   display: flex;
@@ -991,17 +633,17 @@
   gap: 12px;
 }
 
+
 .visibilityModalHint {
   font-size: 0.78rem;
   color: var(--color-text-light);
   padding-left: 4px;
 }
 
+
 .visibilityModalHint strong {
   color: var(--color-text-secondary);
 }
-
-/* ---- 滑动开关 ---- */
 .toggleSwitch {
   position: relative;
   width: 40px;
@@ -1013,9 +655,11 @@
   flex-shrink: 0;
 }
 
+
 .toggleOn {
   background: #dc2626;
 }
+
 
 .toggleSlider {
   position: absolute;
@@ -1029,18 +673,10 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
+
 .toggleOn .toggleSlider {
   transform: translateX(18px);
 }
-
-
-/* ---- 评论锚点高亮 ---- */
-@keyframes commentAnchorHighlight {
-  0% { background-color: rgba(26, 115, 232, 0.2); }
-  100% { background-color: transparent; }
-}
-
-/* ---- 分类选择模态框 ---- */
 .catPickerOverlay {
   position: fixed;
   inset: 0;
@@ -1051,6 +687,7 @@
   z-index: 1000;
   animation: fadeIn 0.15s ease-out;
 }
+
 
 .catPickerModal {
   background: var(--color-bg, #fff);
@@ -1064,6 +701,7 @@
   animation: slideUp 0.2s ease-out;
 }
 
+
 .catPickerHeader {
   display: flex;
   align-items: center;
@@ -1071,12 +709,14 @@
   padding: 16px 20px 8px;
 }
 
+
 .catPickerHeader h3 {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-text);
 }
+
 
 .catPickerClose {
   background: none;
@@ -1089,14 +729,17 @@
   line-height: 1;
 }
 
+
 .catPickerClose:hover {
   background: var(--color-hover-bg);
   color: var(--color-text);
 }
 
+
 .catPickerSearch {
   padding: 8px 20px;
 }
+
 
 .catPickerSearch input {
   width: 100%;
@@ -1109,10 +752,12 @@
   outline: none;
 }
 
+
 .catPickerSearch input:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
 }
+
 
 .catPickerBody {
   flex: 1;
@@ -1120,14 +765,13 @@
   padding: 4px 12px 8px;
 }
 
+
 .catPickerEmpty {
   text-align: center;
   color: var(--color-text-light);
   font-size: 0.85rem;
   padding: 24px 0;
 }
-
-/* 树节点 */
 .catNode {
   display: flex;
   align-items: center;
@@ -1139,18 +783,22 @@
   user-select: none;
 }
 
+
 .catNode:hover {
   background: var(--color-hover-bg);
 }
+
 
 .catNodeSelected {
   background: #dbeafe;
   font-weight: 600;
 }
 
+
 .catNodeSelected:hover {
   background: #c7d9f0;
 }
+
 
 .catNodeChevron {
   width: 14px;
@@ -1163,9 +811,11 @@
   transition: transform 0.15s;
 }
 
+
 .catNodeChevronOpen {
   transform: rotate(90deg);
 }
+
 
 .catNodeIcon {
   font-size: 0.85rem;
@@ -1174,27 +824,26 @@
   color: var(--color-text-light);
 }
 
+
 .catNodeName {
   flex: 1;
   font-size: 0.88rem;
   color: var(--color-text);
 }
 
+
 .catNodeSelected .catNodeName {
   color: var(--color-primary);
 }
+
 
 .catNodeCheck {
   font-size: 0.8rem;
   color: var(--color-primary);
 }
-
-/* 子节点容器 */
 .catChildren {
   overflow: hidden;
 }
-
-/* 分类触发按钮（表单中显示已选分类的字段） */
 .catPickerTrigger {
   display: flex;
   align-items: center;
@@ -1211,22 +860,27 @@
   font-family: var(--font-sans);
 }
 
+
 .catPickerTrigger:hover {
   border-color: var(--color-primary);
 }
+
 
 .catPickerTriggerIcon {
   font-size: 0.85rem;
   color: var(--color-text-light);
 }
 
+
 .catPickerTriggerText {
   flex: 1;
 }
 
+
 .catPickerTriggerPlaceholder {
   color: var(--color-text-light);
 }
+
 
 .catPickerTriggerChevron {
   font-size: 0.7rem;
@@ -1234,37 +888,6 @@
   transition: transform 0.15s;
 }
 
-/* ---- 评论锚点高亮 ---- */
-@keyframes commentAnchorHighlight {
-  0% { background-color: rgba(26, 115, 232, 0.2); }
-  100% { background-color: transparent; }
-}
-
-.highlight {
-  border-radius: var(--border-radius);
-  animation: commentAnchorHighlight 1s steps(1) forwards;
-}
-
-/* ---- TOC 可见时补偿（同 wiki 的 page-content 方案：右侧让位，内容在剩余窗口居中） ---- */
-.tocWrap {
-  width: 100%;
-}
-
-html[data-toc-visible="true"] .tocWrap {
-  padding-right: calc(var(--toc-actual-width, 240px) + 48px); /* TOC + right-gap(24px) + content-gap(24px) */
-}
-
-/* 标题栏衬底仍横跨整个区域：负右边距抵消 tocWrap 的右内边距铺满背景，
-   内部补同等右内边距保证标题文字与正文在同一窗口居中对齐 */
-html[data-toc-visible="true"] .detailHeader {
-  width: auto;
-  margin-right: calc(-1 * (var(--toc-actual-width, 240px) + 48px));
-  padding-right: calc(var(--toc-actual-width, 240px) + 48px);
-}
-
-/* ---- 手机端：置顶帖作者标签太长会挤截断标题，隐藏标签 ----
-   userName-tags 是 UserName 组件里的全局类名，必须用 :global()
-   包裹，否则会被 CSS Module hash 化导致选择器匹配不上。 */
 @media (max-width: 768px) {
   .postCardPinned :global(.userName-tags) {
     display: none;

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import FaIcon from '@/components/FaIcon'
-import { renderClient } from '@/lib/render-client'
+import { renderMarkdown } from '@/lib/markdown'
 import { getSession } from '@/lib/auth'
 import { fetchForumPosts, fetchLikedPostIds, togglePinForumPost } from '@/lib/gist-api'
 import type { ForumPost } from '@/types/gist'
@@ -291,7 +291,7 @@ function PinnedPostCard({ post, onClick, onRefresh }: {
         style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px' }}
       >
         <div className={styles.postTitle} style={{ marginBottom: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          <span dangerouslySetInnerHTML={{ __html: renderClient(post.title) }} />
+          <span dangerouslySetInnerHTML={{ __html: renderMarkdown(post.title) }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
           <span>{formatDate(post.created_at)}</span>
@@ -346,7 +346,7 @@ function PostCard({ post, onClick, onRefresh }: { post: ForumPost; onClick: () =
       >
         <div className={styles.postTitle}>
           {post.is_pinned && <span style={{ marginRight: 4 }}>📌</span>}
-          <span dangerouslySetInnerHTML={{ __html: renderClient(post.title) }} />
+          <span dangerouslySetInnerHTML={{ __html: renderMarkdown(post.title) }} />
         </div>
         <div className={styles.postMeta}>
           <UserName username={post.author_username} userId={post.author_id} className={styles.postAuthor} />

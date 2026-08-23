@@ -17,7 +17,7 @@ import {
   type DmMessage,
 } from '@/lib/gist-api'
 import type { UserInfo } from '@/types/gist'
-import { renderClientWithRegistry, replaceWikiLinks } from '@/lib/render-client'
+import { renderMarkdownWithRegistry, replaceWikiLinks } from '@/lib/markdown'
 import { registry, titleSlugMap } from '@/data/person-registry'
 import { BASE_PATH } from '@/lib/constants'
 import { useCodeCopy } from '@/lib/useCodeCopy'
@@ -469,7 +469,7 @@ function DmChatView({
                       {msg.recalled_at ? (
                         <span className={styles.recalledText}>消息已撤回</span>
                       ) : (
-                        <div className={styles.bubbleContent} dangerouslySetInnerHTML={{ __html: replaceWikiLinks(renderClientWithRegistry(msg.content, registry), titleSlugMap, BASE_PATH).replace(/\n+$/, '') }} />
+                        <div className={styles.bubbleContent} dangerouslySetInnerHTML={{ __html: replaceWikiLinks(renderMarkdownWithRegistry(msg.content, registry), titleSlugMap, BASE_PATH).replace(/\n+$/, '') }} />
                       )}
                     </div>
                     <span className={styles.messageTime}>

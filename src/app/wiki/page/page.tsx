@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { fetchWikiPage } from '@/lib/wiki-api'
-import { renderClient } from '@/lib/render-client'
+import { renderMarkdown, renderAttributesFromFrontmatter } from '@/lib/markdown'
 import { resolveTextHtml } from '@/lib/people'
 import { registry as personRegistry } from '@/data/person-registry'
 import { BASE_PATH } from '@/lib/constants'
@@ -112,7 +112,7 @@ function WikiPageBySlug() {
   // 将 markdown 预渲染为 HTML 并提取标题（用于 TOC）
   const headings = useMemo(() => {
     if (typeof page !== 'object' || !page) return [] as Heading[]
-    const html = renderClient(page.content, { anchor: true, highlight: false, texmath: false })
+    const html = renderMarkdown(page.content, { anchor: true, highlight: false, texmath: false })
     return extractHeadingsFromHtml(html)
   }, [page])
 
@@ -167,19 +167,4 @@ function WikiPageBySlug() {
       {headings.length > 0 && <TableOfContents headings={headings} />}
     </div>
   )
-}
-
-/**
- * 从 frontmatter 中提取 attributes（客户端版本，不依赖服务端 markdown-it）
- * 只做简单文本转义，不支持 LaTeX/Markdown 链接渲染（不影响功能，仅视觉略简）
- */
-function renderAttributesFromFrontmatter(data: Record<string, unknown>): Record<string, string> {
-  const rawAttributes = data.attributes
-  if (!rawAttributes || typeof rawAttributes !== 'object') return {}
-  const result: Record<string, string> = {}
-  for (const [key, value] of Object.entries(rawAttributes)) {
-    const strValue = Array.isArray(value) ? value.join('、') : String(value ?? '')
-    result[key] = strValue
-  }
-  return result
 }

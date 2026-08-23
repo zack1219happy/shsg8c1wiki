@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import FaIcon from '@/components/FaIcon'
 import WikiContent from '@/components/WikiContent'
-import { renderClient } from '@/lib/render-client'
+import { renderMarkdown } from '@/lib/markdown'
 import { getSession } from '@/lib/auth'
 import {
   fetchForumPost,
@@ -24,6 +24,7 @@ import { UserName } from '@/components/UserName'
 import { loadPinyinInitialsFromDB } from '@/lib/people'
 import { useAutoSave, loadDraft } from '@/hooks/useAutoSave'
 import styles from '@/styles/forum.module.css'
+import pd from '@/styles/post-detail.module.css'
 
 const MarkdownEditor = dynamic(
   () => import('@/components/MarkdownEditor').then((m) => m.MarkdownEditor),
@@ -192,9 +193,9 @@ export default function ForumPostPage() {
 
   return (
     <>
-      <div className={styles.detailHeader}>
-        <div className={styles.detailHeaderInner}>
-          <div className={styles.detailTitleRow}>
+      <div className={pd.detailHeader}>
+        <div className={pd.detailHeaderInner}>
+          <div className={pd.detailTitleRow}>
             {editing ? (
               <input
                 className={styles.titleInput}
@@ -205,21 +206,21 @@ export default function ForumPostPage() {
                 autoFocus
               />
             ) : (
-              <h1 className={styles.detailTitle} dangerouslySetInnerHTML={{ __html: renderClient(post.title) }} />
+              <h1 className={pd.detailTitle} dangerouslySetInnerHTML={{ __html: renderMarkdown(post.title) }} />
             )}
             <div style={{ display: 'flex', gap: 4 }}>
               {isAuthor && !editing && (
-                <button className={styles.backBtnIcon} onClick={startEdit} title="编辑帖子">
+                <button className={pd.backBtnIcon} onClick={startEdit} title="编辑帖子">
                   <FaIcon name="pen" />
                 </button>
               )}
-              <button className={styles.backBtnIcon} onClick={editing ? cancelEdit : () => router.push('/forum')} title={editing ? '取消编辑' : '返回讨论区'}>
+              <button className={pd.backBtnIcon} onClick={editing ? cancelEdit : () => router.push('/forum')} title={editing ? '取消编辑' : '返回讨论区'}>
                 <FaIcon name="chevron-left" />
               </button>
             </div>
           </div>
-          <div className={styles.detailMeta}>
-            <UserName username={post.author_username} userId={post.author_id} className={styles.detailAuthor} />
+          <div className={pd.detailMeta}>
+            <UserName username={post.author_username} userId={post.author_id} className={pd.detailAuthor} />
             <span>发布于 {formatDate(post.created_at)}</span>
             {post.updated_at !== post.created_at && (
               <span>编辑于 {formatDate(post.updated_at)}</span>
@@ -252,18 +253,18 @@ export default function ForumPostPage() {
             </div>
           </div>
         ) : (
-          <div className={styles.detail}>
-            <div className={styles.detailBody}>
+          <div className={pd.detail}>
+            <div className={pd.detailBody}>
               <WikiContent content={post.content} className="wiki-body" />
             </div>
 
-            <div className={styles.voteBar}>
-              <button className={`${styles.voteIcon} ${myVote === 'up' ? styles.voteIconActiveUp : ''}`}
+            <div className={pd.voteBar}>
+              <button className={`${pd.voteIcon} ${myVote === 'up' ? pd.voteIconActiveUp : ''}`}
                 onClick={() => handleVote('up')} title="赞"><FaIcon name="thumbs-up" /></button>
-              <span className={`${styles.voteCount} ${(post.upvotes ?? 0) > 0 ? styles.voteCountPositive : ''}`}>{post.upvotes ?? 0}</span>
-              <button className={`${styles.voteIcon} ${myVote === 'down' ? styles.voteIconActiveDown : ''}`}
+              <span className={`${pd.voteCount} ${(post.upvotes ?? 0) > 0 ? pd.voteCountPositive : ''}`}>{post.upvotes ?? 0}</span>
+              <button className={`${pd.voteIcon} ${myVote === 'down' ? pd.voteIconActiveDown : ''}`}
                 onClick={() => handleVote('down')} title="踩"><FaIcon name="thumbs-down" /></button>
-              <span className={`${styles.voteCount} ${(post.downvotes ?? 0) > 0 ? styles.voteCountNegative : ''}`}>{post.downvotes ?? 0}</span>
+              <span className={`${pd.voteCount} ${(post.downvotes ?? 0) > 0 ? pd.voteCountNegative : ''}`}>{post.downvotes ?? 0}</span>
             </div>
 
             <CommentSection source="forum" targetId={postId} title="评论" />

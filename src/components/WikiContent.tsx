@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useEffect, useLayoutEffect, useState } from 'react'
 import DOMPurify from 'dompurify'
-import { renderClientWithRegistry, replaceWikiLinks } from '@/lib/render-client'
+import { renderMarkdownWithRegistry, replaceWikiLinks } from '@/lib/markdown'
 import { registry, titleSlugMap as defaultTitleSlugMap } from '@/data/person-registry'
 import { BASE_PATH } from '@/lib/constants'
 import { fetchPageAssets } from '@/lib/wiki-api'
@@ -78,7 +78,7 @@ export default function WikiContent({ content, format, className, titleSlugMap: 
         const shouldSanitize = !noSanitize
         const rawHtml =
             format === 'markdown' || (format !== 'html' && !looksLikeHtml(content))
-                ? renderClientWithRegistry(content, registry, { highlight: true, texmath: true, anchor: true }, shouldSanitize)
+                ? renderMarkdownWithRegistry(content, registry, { highlight: true, texmath: true, anchor: true }, shouldSanitize)
                 : (typeof window !== 'undefined' && shouldSanitize ? DOMPurify.sanitize(content) : content)
 
         // 替换 Wiki 链接

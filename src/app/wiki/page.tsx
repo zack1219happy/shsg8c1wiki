@@ -1,11 +1,12 @@
 import { fetchWikiPage } from '@/lib/wiki-api'
-import { renderMarkdownAndGetHeadings, renderAttributesFromFrontmatter, renderInlineTitle } from '@/lib/content'
+import { renderMarkdownAndGetHeadings } from '@/lib/content'
+import { renderAttributesFromFrontmatter, renderInlineTitle } from '@/lib/markdown'
 import Breadcrumb from '@/components/Breadcrumb'
 import AttributeBox from '@/components/AttributeBox'
 import TableOfContents from '@/components/TableOfContents'
 import CommentSection from '@/components/CommentSection'
 import WikiEditPanel from '@/components/WikiEditPanel'
-import WikiContentDB from '@/components/WikiContentDB'
+import ContentDB from '@/components/ContentDB'
 import type { NavNode } from '@/lib/navigation'
 
 const homeCrumb: NavNode[] = [{ id: 'home', title: '首页', type: 'page', pathKey: '' }]
@@ -53,7 +54,7 @@ export default async function WikiHomePage() {
         <Breadcrumb crumbs={homeCrumb} baseHref="/wiki" />
         <AttributeBox attributes={attributes} />
 
-        <WikiContentDB slug="home" staticContent={content} />
+        <ContentDB variant="wiki" slug="home" staticContent={content} />
 
         <CommentSection source="wiki" targetId="home" />
       </article>
