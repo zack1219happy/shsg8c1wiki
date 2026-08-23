@@ -1,110 +1,42 @@
-import { notFound } from 'next/navigation'
-import ContentDB from '@/components/ContentDB'
-import TableOfContents from '@/components/TableOfContents'
-import { renderMarkdownAndGetHeadings } from '@/lib/content'
-import type { Heading } from '@/lib/markdown'
 import { supabase } from '@/lib/supabase'
+import AgreementView from './AgreementView'
 
 interface Props {
-  params: Promise<{ slug?: string[] }>
-}
-
-interface AgreementPageSSG {
-  slug: string
-  title: string
-  content: string
-}
-
-interface StaticFallback {
-  title: string
-  rawContent: string
-  slug: string
-  headings: Heading[]
+    params: Promise<{ slug?: string[] }>
 }
 
 interface AgreementSlugRow {
-  slug: string
+    slug: string
 }
 
-async function getDBSlugs(): Promise<string[]> {
-  try {
-    const { data } = await supabase.rpc('get_agreement_slugs')
-    return ((data ?? []) as AgreementSlugRow[]).map((r) => r.slug)
-  } catch {
-    return []
-  }
-}
-
-async function getDBContent(slug: string): Promise<AgreementPageSSG | null> {
-  try {
-    const { data } = await supabase.rpc('get_agreement_page', { p_slug: slug })
-    const rows = (data ?? []) as AgreementPageSSG[]
-    return rows[0] ?? null
-  } catch {
-    return null
-  }
-}
-
+/**
+ * 协议页路由。内容完全客户端取数；
+ * 静态导出的动态路由必须枚举参数，因此保留
+ * 构建期的一次 slug 列表查询（轻量 RPC）。
+ */
 export async function generateStaticParams() {
-  const dbSlugs = await getDBSlugs()
-  const params: { slug: string[] }[] = []
-  for (const s of dbSlugs) {
-    if (s === 'index') {
-      params.push({ slug: [] })
-      params.push({ slug: ['index'] })
-    } else {
-      params.push({ slug: [s] })
+    let slugs: string[] = []
+    try {
+        const { data } = await supabase.rpc('get_agreement_slugs')
+        slugs = ((data ?? []) as AgreementSlugRow[]).map((r) => r.slug)
+    } catch {
+        slugs = ['index']
     }
-  }
-  return params
-}
 
-async function getStaticFallback(slug: string[]): Promise<StaticFallback> {
-  const slugPath = slug.length === 0 ? 'index' : slug.join('/')
-  const db = await getDBContent(slugPath)
-
-  const title = db?.title ?? '协议与帮助'
-  const rawContent = db?.content ?? ''
-
-  // 渲染 markdown 并提取标题供 TOC 使用
-  let headings: Heading[] = []
-  if (rawContent) {
-    const rendered = renderMarkdownAndGetHeadings(rawContent)
-    headings = rendered.headings
-  }
-
-  return { title, rawContent, slug: slugPath, headings }
+    const params: { slug: string[] }[] = []
+    for (const s of slugs) {
+        if (s === 'index') {
+            params.push({ slug: [] })
+            params.push({ slug: ['index'] })
+        } else {
+            params.push({ slug: [s] })
+        }
+    }
+    return params
 }
 
 export default async function AgreementPage({ params }: Props) {
-  const { slug } = await params
-  const slugPath = slug?.length ? slug.join('/') : 'index'
-
-  const staticContent = await getStaticFallback(slug ?? [])
-
-  if (!slug?.length && !staticContent.rawContent) {
-    notFound()
-  }
-
-  return (
-    <div className="page-content" style={{ display: 'flex', gap: '24px' }}>
-      <article
-        style={{
-          maxWidth: '800px',
-          margin: '0 auto',
-          padding: '76px 24px 60px',
-          flex: 1,
-        }}
-      >
-        <ContentDB
-          variant="agreement"
-          slug={slugPath}
-          staticContent={staticContent.rawContent}
-          staticTitle={staticContent.title}
-        />
-      </article>
-
-      <TableOfContents headings={staticContent.headings} />
-    </div>
-  )
+    const { slug } = await params
+    const slugPath = slug?.length ? slug.join('/') : 'index'
+    return <AgreementView slugPath={slugPath} />
 }

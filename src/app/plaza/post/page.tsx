@@ -26,7 +26,7 @@ import {
 import { loadPinyinInitialsFromDB } from '@/lib/people'
 import TableOfContents from '@/components/TableOfContents'
 import CommentSection from '@/components/CommentSection'
-import type { Heading } from '@/lib/content'
+import type { Heading } from '@/lib/markdown'
 import type { PlazaArticleDetail, PlazaCategory, PlazaAPI } from '@/types/plaza'
 import { getCategoryPathById } from '@/types/plaza'
 import { UserName } from '@/components/UserName'

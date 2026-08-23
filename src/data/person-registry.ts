@@ -511,6 +511,7 @@ export const titleSlugMap: Record<string, string> = {
   "还在聊": "geng/still_chatting",
   "文化素养": "geng/whsy",
   "周吨颐": "geng/zhoudunyi",
+  "演wy": "geng/演wy",
   "首页": "home",
   "人物": "people",
   "cwy": "people/cwy",
@@ -541,6 +542,5 @@ export const titleSlugMap: Record<string, string> = {
   "zfy": "people/zfy",
   "zjs": "people/zjs",
   "zmz": "people/zmz",
-  "zyj": "people/zyj",
-  "演wy": "演wy"
+  "zyj": "people/zyj"
 }
