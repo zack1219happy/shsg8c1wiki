@@ -130,11 +130,3 @@ export function loadDraft<T>(key: string): T | null {
 /**
  * 检查是否有已保存的草稿
  */
-export function hasDraft(key: string): boolean {
-  if (typeof window === 'undefined') return false
-  try {
-    return localStorage.getItem(DRAFT_PREFIX + key) !== null
-  } catch {
-    return false
-  }
-}

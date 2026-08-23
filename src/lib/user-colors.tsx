@@ -98,13 +98,6 @@ export function useUserById(userId: string | null | undefined): UserDecoration |
 }
 
 /**
- * 获取用户名颜色（向后兼容）
- */
-export function useUserColor(username: string): string | null {
-  return useUserDecoration(username)?.color ?? null
-}
-
-/**
  * 获取用户完整装饰信息（颜色 + 标签列表）。按当前用户名反向解析到 ID 再取值。
  * 历史内容的旧用户名快照解析不到时返回 null，由调用方回退。
  */

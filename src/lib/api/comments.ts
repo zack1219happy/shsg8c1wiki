@@ -31,7 +31,7 @@ interface UnifiedCommentRow {
   deleted: boolean
 }
 
-export function toUnifiedComment(raw: UnifiedCommentRow): UnifiedComment {
+function toUnifiedComment(raw: UnifiedCommentRow): UnifiedComment {
   return {
     id: raw.id,
     parentId: raw.parent_id ?? null,

@@ -31,7 +31,7 @@ import type {
 // i18n 中文标签
 // ============================================================
 
-export const labels: Record<string, string> = {
+const labels: Record<string, string> = {
   bold: '粗体',
   italic: '斜体',
   strikethrough: '删除线',
@@ -91,17 +91,8 @@ export function t(key: string): string {
 // 对话框请求
 // ============================================================
 
-export const IMAGE_DIALOG: DialogRequest = {
-  type: 'form',
-  title: t('dialogImgTitle'),
-  fields: [
-    { type: 'text', name: 'url', label: t('dialogImgUrl'), placeholder: 'https://…' },
-    { type: 'text', name: 'alt', label: t('dialogImgAlt') },
-  ],
-  fn: (data) => `![${data.alt || ''}](${data.url || ''})`,
-}
 
-export const LINK_DIALOG: DialogRequest = {
+const LINK_DIALOG: DialogRequest = {
   type: 'form',
   title: t('dialogLinkTitle'),
   fields: [
@@ -111,7 +102,7 @@ export const LINK_DIALOG: DialogRequest = {
   fn: (data) => `[${data.text || data.href}](${data.href || ''})`,
 }
 
-export const TABLE_DIALOG: DialogRequest = {
+const TABLE_DIALOG: DialogRequest = {
   type: 'form',
   title: t('dialogTableTitle'),
   fields: [
@@ -130,7 +121,7 @@ export const TABLE_DIALOG: DialogRequest = {
   },
 }
 
-export const CODE_DIALOG: DialogRequest = {
+const CODE_DIALOG: DialogRequest = {
   type: 'form',
   title: t('dialogCodeTitle'),
   fields: [

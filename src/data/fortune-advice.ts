@@ -19,7 +19,7 @@ export interface AdviceItem {
   detail: string
 }
 
-export const advicePool: Record<FortuneDomain, AdviceItem[]> = {
+const advicePool: Record<FortuneDomain, AdviceItem[]> = {
   // ═══════════════════ 考试日 ═══════════════════
   exam: [
     // — wiki 相关 —

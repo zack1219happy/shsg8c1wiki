@@ -137,13 +137,6 @@ export async function getUserPlazaVote(articleId: string): Promise<string | null
   return data as string | null
 }
 
-export async function fetchLikedPlazaIds(): Promise<string[]> {
-  const s = (await import('@/lib/auth')).getSession()
-  if (!s) return []
-  const { data, error } = await supabase.rpc('get_user_liked_plaza_ids', { p_user_id: s.userId })
-  if (error) throw new Error('获取赞过的文章失败: ' + error.message)
-  return (data ?? []).map((r: { article_id: string }) => r.article_id)
-}
 
 /** 管理员奖励作者积分 */
 export async function awardPlazaArticlePoints(articleId: string, amount: number): Promise<boolean> {

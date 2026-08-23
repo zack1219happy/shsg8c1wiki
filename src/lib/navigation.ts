@@ -31,7 +31,7 @@ export interface NavNode {
   pathKey?: string
 }
 
-export const SITE_TITLE = '上中二旦社区'
+const SITE_TITLE = '上中二旦社区'
 
 const WIKI_DIR = path.join(process.cwd(), 'data', 'wiki')
 
@@ -242,90 +242,11 @@ export async function getNavTreeFromDB(): Promise<NavNode[]> {
 
 // ---------- 公开 API ----------
 
-export function getNavTree(): NavNode[] {
-  return getWikiTreeInternal()
-}
 
 export function getSiteTitle(): string {
   return SITE_TITLE
 }
 
-export function findNodeBySlug(slugPath: string): NavNode | null {
-  if (!slugPath) return null
-  const segments = slugPath.split('/')
 
-  function find(nodes: NavNode[], segs: string[]): NavNode | null {
-    if (segs.length === 0) return null
-    const [head, ...rest] = segs
-    const node = nodes.find((n) => n.id === head)
-    if (!node) return null
-    return rest.length === 0 ? node : find(node.children ?? [], rest)
-  }
 
-  return find(getWikiTreeInternal(), segments)
-}
 
-export function getAllSlugs(): string[][] {
-  const slugs: string[][] = []
-
-  function walk(nodes: NavNode[], prefix: string[] = []) {
-    for (const node of nodes) {
-      if (prefix.length === 0 && node.id === 'home') {
-        // home 映射到根路径，不加入 slugs
-        if (node.children) walk(node.children, [])
-        continue
-      }
-      slugs.push([...prefix, node.id])
-      if (node.children) walk(node.children, [...prefix, node.id])
-    }
-  }
-
-  walk(getWikiTreeInternal())
-  return slugs
-}
-
-export function getBreadcrumbs(slugPath: string): NavNode[] {
-  if (!slugPath) return []
-  const tree = getWikiTreeInternal()
-  let segments = slugPath.split('/')
-  let curr = tree
-
-  if (segments[0] === 'home') {
-    const homeNode = tree.find((n) => n.id === 'home')
-    if (homeNode?.children) curr = homeNode.children
-    segments = segments.slice(1)
-  }
-
-  const crumbs: NavNode[] = []
-  for (const seg of segments) {
-    const node = curr.find((n) => n.id === seg)
-    if (!node) break
-    crumbs.push(node)
-    if (node.children) curr = node.children
-  }
-  return crumbs
-}
-
-// ---------- Wiki Link：标题 → 路径索引 ----------
-
-function buildTitleToSlugMap(): Map<string, string> {
-  const map = new Map<string, string>()
-
-  function walk(nodes: NavNode[], prefix: string[] = []) {
-    for (const node of nodes) {
-      const slug = [...prefix, node.id].join('/')
-      map.set(node.title, slug)
-      if (node.children) walk(node.children, [...prefix, node.id])
-    }
-  }
-
-  walk(getWikiTreeInternal())
-  return map
-}
-
-let cachedTitleMap: Map<string, string> | null = null
-
-export function getTitleToSlugMap(): Map<string, string> {
-  if (!cachedTitleMap) cachedTitleMap = buildTitleToSlugMap()
-  return cachedTitleMap
-}

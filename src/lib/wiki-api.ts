@@ -110,11 +110,6 @@ export async function fetchPendingRevisions(): Promise<WikiRevision[]> {
 
 // ── 获取所有修订（admin） ──
 
-export async function fetchAllRevisions(status?: string): Promise<WikiRevision[]> {
-  const { data, error } = await supabase.rpc('get_all_revisions', { p_status: status ?? null })
-  if (error) throw new Error('获取修订列表失败: ' + error.message)
-  return (data ?? []) as WikiRevision[]
-}
 
 // ── 获取修订详情（admin） ──
 
@@ -156,11 +151,6 @@ export async function rejectWikiRevision(
 
 // ── 获取自己的 pending ──
 
-export async function fetchMyPendingRevisions(): Promise<MyPendingRevision[]> {
-  const { data, error } = await supabase.rpc('get_my_pending_revisions')
-  if (error) throw new Error('获取我的修订失败: ' + error.message)
-  return (data ?? []) as MyPendingRevision[]
-}
 
 // ── 获取指定页面的自己的 pending ──
 
@@ -181,11 +171,6 @@ export interface WikiAsset {
 
 // ── 获取所有 wiki slug（用于 SSG params） ──
 
-export async function fetchWikiSlugs(): Promise<string[]> {
-  const { data, error } = await supabase.rpc('get_wiki_slugs')
-  if (error) throw new Error('获取 wiki slug 列表失败: ' + error.message)
-  return (data ?? []).map((r: { slug: string }) => r.slug)
-}
 
 // ── 获取所有 wiki 页面（用于导航树） ──
 
@@ -265,11 +250,6 @@ export async function fetchPendingPageRequests(): Promise<PageRequest[]> {
 }
 
 /** 获取所有页面请求（admin） */
-export async function fetchAllPageRequests(status?: string): Promise<PageRequest[]> {
-  const { data, error } = await supabase.rpc('get_all_page_requests', { p_status: status ?? null })
-  if (error) throw new Error('获取请求列表失败: ' + error.message)
-  return (data ?? []) as PageRequest[]
-}
 
 /** 获取请求详情（admin） */
 export async function fetchPageRequestDetail(id: string): Promise<PageRequestDetail | null> {
@@ -306,18 +286,8 @@ export async function rejectPageRequest(
 }
 
 /** 获取自己的页面请求列表 */
-export async function fetchMyPageRequests(): Promise<MyPageRequest[]> {
-  const { data, error } = await supabase.rpc('get_my_page_requests')
-  if (error) throw new Error('获取我的请求失败: ' + error.message)
-  return (data ?? []) as MyPageRequest[]
-}
 
 /** 检查 slug 是否可用 */
-export async function checkSlugAvailable(slug: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('check_slug_available', { p_slug: slug })
-  if (error) throw new Error('检查失败: ' + error.message)
-  return data as boolean
-}
 
 export async function fetchPageAssets(slug: string): Promise<Map<string, string>> {
   const { data, error } = await supabase.rpc('get_page_assets', { p_slug: slug })
