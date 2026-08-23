@@ -12,6 +12,7 @@ node_modules/
 # ide
 .vscode/
 .idea/
+.claude/
 data/.obsidian/
 
 # os

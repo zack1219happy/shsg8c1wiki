@@ -401,11 +401,3 @@
   color: #e74c3c;
   padding: 20px 0;
 }
-
-/* ---- TOC 可见时补偿 ---- */
-html[data-toc-visible="true"] .page,
-html[data-toc-visible="true"] .detailHeaderInner,
-html[data-toc-visible="true"] .detailBody {
-  margin-left: auto;
-  margin-right: calc(24px + var(--toc-actual-width, 240px) + 24px);
-}

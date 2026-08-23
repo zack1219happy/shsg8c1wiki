@@ -446,6 +446,8 @@ export default function PlazaArticlePage() {
 
   return (
     <>
+      {/* TOC 可见时右侧让位，标题栏与正文在剩余窗口居中（同 wiki 的 page-content 方案） */}
+      <div className={styles.tocWrap}>
       <div className={styles.detailHeader}>
         <div className={styles.detailHeaderInner}>
           <div className={styles.detailTitleRow}>
@@ -659,6 +661,7 @@ export default function PlazaArticlePage() {
             />
           </div>
         )}
+      </div>
       </div>
 
       {/* TOC */}

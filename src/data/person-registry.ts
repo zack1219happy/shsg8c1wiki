@@ -508,6 +508,7 @@ export const titleSlugMap: Record<string, string> = {
   "jrq是大佬（jr7sdl）": "geng/jr7sdl",
   "jw病毒": "geng/jwvirus",
   "梗列表": "geng/list",
+  "还在聊": "geng/still_chatting",
   "文化素养": "geng/whsy",
   "周吨颐": "geng/zhoudunyi",
   "首页": "home",
@@ -540,5 +541,6 @@ export const titleSlugMap: Record<string, string> = {
   "zfy": "people/zfy",
   "zjs": "people/zjs",
   "zmz": "people/zmz",
-  "zyj": "people/zyj"
+  "zyj": "people/zyj",
+  "演wy": "演wy"
 }
