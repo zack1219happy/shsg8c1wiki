@@ -1,316 +1,160 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
+import { useCallback, useEffect, useState } from 'react'
 import FaIcon from '@/components/FaIcon'
 import CategoryPickerModal from '@/components/CategoryPickerModal'
+import ToggleField from '@/components/ToggleField'
+import NewPostFormShell from '@/components/NewPostFormShell'
 import { getSession } from '@/lib/auth'
 import { createPlazaArticle, fetchPlazaCategories, checkPlazaDuplicate } from '@/lib/gist-api'
 import { loadPinyinInitialsFromDB } from '@/lib/people'
-import { useAutoSave, loadDraft } from '@/hooks/useAutoSave'
+import { useNewPostForm } from '@/hooks/useNewPostForm'
 import type { PlazaCategory } from '@/types/plaza'
 import Styles from '@/styles/forum.module.css'
 
 /* ==============================================================
    发表文章页
-   - 默认私密、可见性用论坛 toggleSwitch 控件
+   - 默认私密，可见性/JS 开关用共享 ToggleField
    - 分类通过 CategoryPickerModal 从数据库分类树中选择
    ============================================================== */
 
-const MarkdownEditor = dynamic(
-  () => import('@/components/MarkdownEditor').then((m) => m.MarkdownEditor),
-  { ssr: false },
-)
-
 export default function NewArticlePage() {
-  const router = useRouter()
+    const [categoryId, setCategoryId] = useState<string | null>(null) // 用户选的分类 ID
+    const [categoryName, setCategoryName] = useState<string | null>(null) // 用户选的分类名（用于显示）
+    const [isPublic, setIsPublic] = useState(false) // 默认私密
+    const [hasJs, setHasJs] = useState(false)
+    const [categories, setCategories] = useState<PlazaCategory[]>([])
+    const [pickerOpen, setPickerOpen] = useState(false)
+    const session = getSession()
 
-  // 表单字段
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [categoryId, setCategoryId] = useState<string | null>(null) // 用户选的分类 ID
-  const [categoryName, setCategoryName] = useState<string | null>(null) // 用户选的分类名（用于显示）
-  const [isPublic, setIsPublic] = useState(false) // 默认私密
-  const [hasJs, setHasJs] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [dupWarning, setDupWarning] = useState<{ existing_title: string; created_at: string } | null>(null)
-  const [categories, setCategories] = useState<PlazaCategory[]>([])
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const session = getSession()
+    useEffect(() => { loadPinyinInitialsFromDB() }, [])
 
-  useEffect(() => { loadPinyinInitialsFromDB() }, [])
+    // 加载分类
+    useEffect(() => {
+        fetchPlazaCategories()
+            .then(setCategories)
+            .catch(() => {})
+    }, [])
 
-  // 加载分类
-  useEffect(() => {
-    fetchPlazaCategories()
-      .then(setCategories)
-      .catch(() => {})
-  }, [])
+    const form = useNewPostForm({
+        draftKey: 'plaza_new',
+        extraDraft: { categoryId, categoryName, isPublic, hasJs },
+        onRestoreExtra: (draft) => {
+            if (typeof draft.categoryId === 'string') setCategoryId(draft.categoryId)
+            if (typeof draft.categoryName === 'string') setCategoryName(draft.categoryName)
+            if (draft.isPublic !== undefined) setIsPublic(draft.isPublic as boolean)
+            if (draft.hasJs !== undefined) setHasJs(draft.hasJs as boolean)
+        },
+        checkDuplicate: (title, content) => checkPlazaDuplicate(title, content),
+        publish: async (title, content) => {
+            const cat = categories.find((c) => c.id === categoryId)
+            if (!cat) throw new Error('无效的分类')
+            const slug =
+                title
+                    .toLowerCase()
+                    .replace(/[^\w一-鿿-]+/g, '-')
+                    .replace(/^-+|-+$/g, '') +
+                '-' +
+                Date.now().toString(36)
+            await createPlazaArticle(title, slug, content, categoryId!, isPublic, hasJs)
+            return '/plaza/post?slug=' + encodeURIComponent(slug)
+        },
+        errorFallback: '发布失败',
+    })
 
-  // 恢复草稿
-  useEffect(() => {
-    void (async () => {
-      interface DraftData {
-        title: string
-        content: string
-        categoryId: string | null
-        categoryName: string | null
-        isPublic: boolean
-        hasJs: boolean
-      }
-      const draft = loadDraft<DraftData>('plaza_new')
-      if (draft) {
-        if (draft.title) setTitle(draft.title)
-        if (draft.content) setContent(draft.content)
-        if (draft.categoryId) setCategoryId(draft.categoryId)
-        if (draft.categoryName) setCategoryName(draft.categoryName)
-        if (draft.isPublic !== undefined) setIsPublic(draft.isPublic)
-        if (draft.hasJs !== undefined) setHasJs(draft.hasJs)
-      }
-    })()
-  }, [])
+    // 分类显示文本（含父级路径）
+    const categoryLabel = useCallback(() => {
+        if (!categoryName) return null
+        const cat = categories.find((c) => c.name === categoryName)
+        if (!cat) return categoryName
+        const parts: string[] = [cat.name]
+        let parentId = cat.parent_id
+        while (parentId) {
+            const parent = categories.find((c) => c.id === parentId)
+            if (!parent) break
+            parts.unshift(parent.name)
+            parentId = parent.parent_id
+        }
+        return parts.join(' · ')
+    }, [categoryName, categories])
 
-  // 自动保存草稿
-  const hasContent = title.trim() !== '' || content.trim() !== ''
-  const { clearDraft } = useAutoSave({
-    key: 'plaza_new',
-    data: { title, content, categoryId, categoryName, isPublic, hasJs },
-    enabled: hasContent,
-  })
-
-  // 分类显示文本
-  const categoryLabel = useMemo(() => {
-    if (!categoryName) return null
-    // 找到该分类节点及其父节点，显示完整路径
-    const cat = categories.find((c) => c.name === categoryName)
-    if (!cat) return categoryName
-    const parts: string[] = [cat.name]
-    let parentId = cat.parent_id
-    while (parentId) {
-      const parent = categories.find((c) => c.id === parentId)
-      if (!parent) break
-      parts.unshift(parent.name)
-      parentId = parent.parent_id
-    }
-    return parts.join(' · ')
-  }, [categoryName, categories])
-
-  const handleSubmit = useCallback(async () => {
-    if (!title.trim() || !content.trim() || !session || !categoryId) return
-
-    // 预检重复
-    const dup = await checkPlazaDuplicate(title.trim(), content.trim())
-    if (dup) {
-      setDupWarning({ existing_title: dup.existing_title, created_at: dup.created_at })
-      return
-    }
-
-    setSubmitting(true)
-    setError(null)
-    try {
-      // 从分类 ID 直接使用
-      const cat = categories.find((c) => c.id === categoryId)
-      if (!cat) { setError('无效的分类'); return }
-
-      const slug =
-        title
-          .trim()
-          .toLowerCase()
-          .replace(/[^\w一-鿿-]+/g, '-')
-          .replace(/^-+|-+$/g, '') +
-        '-' +
-        Date.now().toString(36)
-      await createPlazaArticle(title.trim(), slug, content.trim(), categoryId, isPublic, hasJs)
-      clearDraft()
-      router.push('/plaza/post?slug=' + encodeURIComponent(slug))
-    } catch (e: unknown) {
-      setError(e instanceof Error && e.message ? e.message : '发布失败')
-    } finally {
-      setSubmitting(false)
-    }
-  }, [title, content, session, categoryId, categories, isPublic, hasJs, router, clearDraft])
-
-  /** 忽略重复警告，强制发布 */
-  const handleForceSubmit = useCallback(async () => {
-    if (!title.trim() || !content.trim() || !session || !categoryId) return
-    setDupWarning(null)
-    setSubmitting(true)
-    setError(null)
-    try {
-      const cat = categories.find((c) => c.id === categoryId)
-      if (!cat) { setError('无效的分类'); return }
-
-      const slug =
-        title
-          .trim()
-          .toLowerCase()
-          .replace(/[^\w一-鿿-]+/g, '-')
-          .replace(/^-+|-+$/g, '') +
-        '-' +
-        Date.now().toString(36)
-      await createPlazaArticle(title.trim(), slug, content.trim(), categoryId, isPublic, hasJs)
-      clearDraft()
-      router.push('/plaza/post?slug=' + encodeURIComponent(slug))
-    } catch (e: unknown) {
-      setError(e instanceof Error && e.message ? e.message : '发布失败')
-    } finally {
-      setSubmitting(false)
-    }
-  }, [title, content, session, categoryId, categories, isPublic, hasJs, router, clearDraft])
-
-  if (!session) {
-    return (
-      <div className={Styles.page}>
-        <p className={Styles.error}>请先登录后再发文章</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className={Styles.page}>
-      <div className={Styles.header}>
-        <h2>
-          <FaIcon name="pen" /> 发表文章
-        </h2>
-        <button className={`${Styles.btn} ${Styles.btnOutline}`} onClick={() => router.push('/plaza')}>
-          ← 返回
-        </button>
-      </div>
-
-      <div className={Styles.newPostForm}>
-        <input
-          className={Styles.titleInput}
-          type="text"
-          placeholder="文章标题"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          maxLength={100}
-          autoFocus
-        />
-
-        {/* 分类选择器 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 500 }}>分类</label>
-          <button
-            type="button"
-            className={Styles.catPickerTrigger}
-            onClick={() => setPickerOpen(true)}
-          >
-            <FaIcon name="folder" className={Styles.catPickerTriggerIcon} />
-            <span className={`${Styles.catPickerTriggerText} ${!categoryLabel ? Styles.catPickerTriggerPlaceholder : ''}`}>
-              {categoryLabel || '选择分类…'}
-            </span>
-            <FaIcon name="chevron-right" className={Styles.catPickerTriggerChevron} />
-          </button>
-        </div>
-
-        {/* 可见性 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>可见性</span>
-          <div
-            className={Styles.toggleSwitch + (isPublic ? ' ' + Styles.toggleOn : '')}
-            onClick={() => setIsPublic(!isPublic)}
-            role="switch"
-            aria-checked={isPublic}
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsPublic(!isPublic) } }}
-          >
-            <div className={Styles.toggleSlider} />
-          </div>
-          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
-            {isPublic ? '公开（所有人可见）' : '私密（仅自己可见）'}
-          </span>
-        </div>
-
-        {/* JS 开关 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-            JavaScript
-            <span
-              title="开启后，读者可选择直接运行页面中的 JavaScript（跳过安全过滤）。仅在您信任内容的情况下使用。"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 14,
-                height: 14,
-                borderRadius: '50%',
-                border: '1px solid var(--color-border, #ddd)',
-                fontSize: '0.65rem',
-                cursor: 'help',
-                color: 'var(--color-text-secondary, #999)',
-                marginLeft: 4,
-                verticalAlign: 'middle',
-              }}
-            >
-              ?
-            </span>
-          </span>
-          <div
-            className={Styles.toggleSwitch + (hasJs ? ' ' + Styles.toggleOn : '')}
-            onClick={() => setHasJs(!hasJs)}
-            role="switch"
-            aria-checked={hasJs}
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHasJs(!hasJs) } }}
-          >
-            <div className={Styles.toggleSlider} />
-          </div>
-          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
-            {hasJs ? '开启' : '关闭'}
-          </span>
-        </div>
-
-        <div className={Styles.editorWrapper}>
-          <MarkdownEditor value={content} onChange={setContent} className={Styles.editorNoBorder} noSanitizePreview={hasJs} />
-        </div>
-
-        {error && <p className={Styles.error}>{error}</p>}
-
-        {/* 重复内容警告 */}
-        {dupWarning && (
-          <div className={Styles.dupWarning}>
-            <div className={Styles.dupWarningContent}>
-              <p><strong>检测到重复内容</strong></p>
-              <p>您已在 {new Date(dupWarning.created_at).toLocaleString('zh-CN')} 发过标题为「{dupWarning.existing_title}」的文章，内容相似。</p>
-              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>确认再次发布吗？</p>
-              <div className={Styles.dupWarningActions}>
-                <button className={`${Styles.btn} ${Styles.btnOutline}`} onClick={() => setDupWarning(null)}>
-                  不发布了
-                </button>
-                <button className={`${Styles.btn} ${Styles.btnPrimary}`} onClick={handleForceSubmit}>
-                  确认发布
-                </button>
-              </div>
+    if (!session) {
+        return (
+            <div className={Styles.page}>
+                <p className={Styles.error}>请先登录后再发文章</p>
             </div>
-          </div>
-        )}
+        )
+    }
 
-        <div className={Styles.formActions}>
-          <button className={`${Styles.btn} ${Styles.btnOutline}`} onClick={() => router.push('/plaza')}>
-            取消
-          </button>
-          <button
-            className={`${Styles.btn} ${Styles.btnPrimary}`}
-            onClick={handleSubmit}
-            disabled={submitting || !title.trim() || !content.trim() || !categoryId}
-          >
-            {submitting ? '发布中…' : '发布文章'}
-          </button>
-        </div>
-      </div>
+    return (
+        <>
+            <NewPostFormShell
+                heading={<><FaIcon name="pen" /> 发表文章</>}
+                backHref="/plaza"
+                noun="文章"
+                titlePlaceholder="文章标题"
+                title={form.title}
+                onTitleChange={form.setTitle}
+                content={form.content}
+                onContentChange={form.setContent}
+                noSanitizePreview={hasJs}
+                canSubmit={!!categoryId}
+                controls={
+                    <>
+                        {/* 分类选择器 */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 500 }}>分类</label>
+                            <button
+                                type="button"
+                                className={Styles.catPickerTrigger}
+                                onClick={() => setPickerOpen(true)}
+                            >
+                                <FaIcon name="folder" className={Styles.catPickerTriggerIcon} />
+                                <span className={`${Styles.catPickerTriggerText} ${!categoryLabel() ? Styles.catPickerTriggerPlaceholder : ''}`}>
+                                    {categoryLabel() || '选择分类…'}
+                                </span>
+                                <FaIcon name="chevron-right" className={Styles.catPickerTriggerChevron} />
+                            </button>
+                        </div>
 
-      {/* 分类选择模态框 */}
-      {pickerOpen && (
-        <CategoryPickerModal
-          categories={categories}
-          selectedName={categoryName}
-          onConfirm={(id, name) => { setCategoryId(id); setCategoryName(name) }}
-          onClose={() => setPickerOpen(false)}
-        />
-      )}
-    </div>
-  )
+                        {/* 可见性 */}
+                        <ToggleField
+                            label="可见性"
+                            checked={isPublic}
+                            onChange={setIsPublic}
+                            onText="公开（所有人可见）"
+                            offText="私密（仅自己可见）"
+                        />
+
+                        {/* JS 开关 */}
+                        <ToggleField
+                            label="JavaScript"
+                            tooltip="开启后，读者可选择直接运行页面中的 JavaScript（跳过安全过滤）。仅在您信任内容的情况下使用。"
+                            checked={hasJs}
+                            onChange={setHasJs}
+                            onText="开启"
+                            offText="关闭"
+                        />
+                    </>
+                }
+                error={form.error}
+                submitting={form.submitting}
+                onSubmit={form.submit}
+                dupWarning={form.dupWarning}
+                onDismissDup={form.dismissDup}
+                onForceSubmit={form.forceSubmit}
+                submitLabel="发布文章"
+            />
+
+            {/* 分类选择模态框 */}
+            {pickerOpen && (
+                <CategoryPickerModal
+                    categories={categories}
+                    selectedName={categoryName}
+                    onConfirm={(id, name) => { setCategoryId(id); setCategoryName(name) }}
+                    onClose={() => setPickerOpen(false)}
+                />
+            )}
+        </>
+    )
 }

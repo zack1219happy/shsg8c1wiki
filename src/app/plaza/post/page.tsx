@@ -5,718 +5,522 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import FaIcon from '@/components/FaIcon'
 import WikiContent from '@/components/WikiContent'
-import { renderMarkdown, createMarkdown } from '@/lib/markdown'
+import { renderMarkdown, createMarkdown, extractHeadingsFromHtml, type Heading } from '@/lib/markdown'
 import { getSession, type UserSession } from '@/lib/auth'
 import {
-  fetchPlazaArticle,
-  deletePlazaArticle,
-  updatePlazaArticle,
-  votePlazaArticle,
-  removePlazaVote,
-  getUserPlazaVote,
-  fetchPlazaCategories,
-  awardPlazaArticlePoints,
-  tipPlazaArticle,
-  fetchMyPoints,
-  sendPlazaPoints,
-  fetchPlazaArticleTips,
-  getPlazaStorage,
-  setPlazaStorage,
+    fetchPlazaArticle,
+    deletePlazaArticle,
+    updatePlazaArticle,
+    votePlazaArticle,
+    removePlazaVote,
+    getUserPlazaVote,
+    fetchPlazaCategories,
+    awardPlazaArticlePoints,
+    tipPlazaArticle,
+    fetchMyPoints,
+    sendPlazaPoints,
+    fetchPlazaArticleTips,
+    getPlazaStorage,
+    setPlazaStorage,
 } from '@/lib/gist-api'
+import { formatDate } from '@/lib/forum'
 import { loadPinyinInitialsFromDB } from '@/lib/people'
 import TableOfContents from '@/components/TableOfContents'
 import CommentSection from '@/components/CommentSection'
-import type { Heading } from '@/lib/markdown'
+import { PostDetailShell, VoteBar } from '@/components/PostDetail'
+import PointsAmountModal from '@/components/PointsAmountModal'
+import ToggleField from '@/components/ToggleField'
 import type { PlazaArticleDetail, PlazaCategory, PlazaAPI } from '@/types/plaza'
 import { getCategoryPathById } from '@/types/plaza'
 import { UserName } from '@/components/UserName'
 import { showWarningToast } from '@/lib/toast'
 import JSSafetyDialog from '@/components/JSSafetyDialog'
 import { useAutoSave, loadDraft } from '@/hooks/useAutoSave'
-import { extractHeadingsFromHtml } from '@/lib/markdown'
+import { useOptimisticVote } from '@/hooks/useOptimisticVote'
 import styles from '@/styles/forum.module.css'
 import pd from '@/styles/post-detail.module.css'
-import pointsStyles from '@/styles/points.module.css'
 
 const MarkdownEditor = dynamic(
-  () => import('@/components/MarkdownEditor').then((m) => m.MarkdownEditor),
-  { ssr: false },
+    () => import('@/components/MarkdownEditor').then((m) => m.MarkdownEditor),
+    { ssr: false },
 )
 
 declare global {
-  interface Window {
-    /** 暴露给 ```sandbox 沙箱 JS 的全局 API（同源 iframe 内通过 window.plazaAPI 访问） */
-    plazaAPI?: PlazaAPI
-  }
+    interface Window {
+        /** 暴露给 ```sandbox 沙箱 JS 的全局 API（同源 iframe 内通过 window.plazaAPI 访问） */
+        plazaAPI?: PlazaAPI
+    }
 }
 
 /* ==============================================================
-   文章详情页 — 查看 / 编辑 / 删除 / 赞+踩
-   - 复用论坛 detailHeader + detailBody + voteBar 布局
+   文章详情页 — 查看 / 编辑 / 删除 / 赞+踩 / 投币 / 奖励
+   - 与论坛帖共用 PostDetailShell + VoteBar + 乐观投票
    - TOC 从渲染后 HTML 提取标题（与 wiki 一致）
-   - 编辑模式：分类只读，可见性用 toggleSwitch
+   - 编辑模式：分类只读，可见性/JS 用 ToggleField
    - 静态路由 ?slug=xxx，与论坛帖子一致
    ============================================================== */
 
 const TIP_PRESETS = [1, 2, 5, 10]
 
 export default function PlazaArticlePage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const slug = searchParams.get('slug') || ''
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const slug = searchParams.get('slug') || ''
 
-  const [article, setArticle] = useState<PlazaArticleDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [session, setSession] = useState<UserSession | null>(null)
-  const [myVote, setMyVote] = useState<string | null>(null)
-  const [editing, setEditing] = useState(false)
-  const [editTitle, setEditTitle] = useState('')
-  const [editContent, setEditContent] = useState('')
-  const [editIsPublic, setEditIsPublic] = useState(true)
-  const [editHasJs, setEditHasJs] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [categories, setCategories] = useState<PlazaCategory[]>([])
-  // JS 模式：null=待决定，'safe'=安全模式，'js'=原文模式
-  const [jsMode, setJsMode] = useState<'safe' | 'js' | null>(null)
-  const [showDialog, setShowDialog] = useState(false)
-  const [hasJs, setHasJs] = useState(false)
+    const [article, setArticle] = useState<PlazaArticleDetail | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+    const [session, setSession] = useState<UserSession | null>(null)
+    const [myVote, setMyVote] = useState<'up' | 'down' | null>(null)
+    const [editing, setEditing] = useState(false)
+    const [editTitle, setEditTitle] = useState('')
+    const [editContent, setEditContent] = useState('')
+    const [editIsPublic, setEditIsPublic] = useState(true)
+    const [editHasJs, setEditHasJs] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const [categories, setCategories] = useState<PlazaCategory[]>([])
+    // JS 模式：null=待决定，'safe'=安全模式，'js'=原文模式
+    const [jsMode, setJsMode] = useState<'safe' | 'js' | null>(null)
+    const [showDialog, setShowDialog] = useState(false)
+    const [hasJs, setHasJs] = useState(false)
+    // 弹窗开关
+    const [showAwardModal, setShowAwardModal] = useState(false)
+    const [showTipModal, setShowTipModal] = useState(false)
 
-  useEffect(() => {
-    if (!slug) return
-    ;(async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const [a, s] = await Promise.all([
-          fetchPlazaArticle(slug),
-          getSession(),
-        ])
-        setArticle(a)
-        setSession(s)
-        // 加载成功后拉用户投票状态
-        if (a) {
-          getUserPlazaVote(a.id).then(setMyVote).catch(() => {})
-        }
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : null)
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [slug])
+    useEffect(() => {
+        if (!slug) return
+        ;(async () => {
+            try {
+                setLoading(true)
+                setError(null)
+                const [a, s] = await Promise.all([
+                    fetchPlazaArticle(slug),
+                    getSession(),
+                ])
+                setArticle(a)
+                setSession(s)
+                // 加载成功后拉用户投票状态
+                if (a) {
+                    getUserPlazaVote(a.id).then((v) => setMyVote(v as "up" | "down" | null)).catch(() => {})
+                }
+            } catch (e: unknown) {
+                setError(e instanceof Error ? e.message : null)
+            } finally {
+                setLoading(false)
+            }
+        })()
+    }, [slug])
 
-  // ── 注入沙箱 JS 全局 API：window.plazaAPI ──
-  // 每个 sandbox iframe（同源）内的桥接脚本会把自身 window.plazaAPI 指向这里，
-  // 并把 setWindowHeight 替换为基于 frameElement 的实现。
-  useEffect(() => {
-    if (!article) return
-    const api: PlazaAPI = {
-      getUserInfo: async () => {
-        const s = getSession()
-        if (!s) return null
-        const totalPoints = await fetchMyPoints()
-        return { username: s.username, student_id: s.studentId, total_points: totalPoints }
-      },
-      setWindowHeight: () => {
-        // 真实实现由 SandboxBox 注入 iframe 的桥接脚本负责（frameElement 定位自身 iframe），
-        // 父页面该方法为 no-op，避免误用（无 iframe 上下文无法定位目标）。
-      },
-      sendPoints: (amount, cap, floor, once = false) =>
-        sendPlazaPoints(article.id, amount, cap, floor, once),
-      getArticleTips: () => fetchPlazaArticleTips(article.id),
-      storage: {
-        getItem: (key) => getPlazaStorage(article.id, key),
-        setItem: (key, value) => setPlazaStorage(article.id, key, value),
-      },
-    }
-    window.plazaAPI = api
-    return () => {
-      if (window.plazaAPI === api) delete window.plazaAPI
-    }
-  }, [article])
+    /** 局部刷新文章（更新 comment_count 等） */
+    const refreshArticle = useCallback(async () => {
+        if (!slug) return
+        try {
+            const a = await fetchPlazaArticle(slug)
+            setArticle(a)
+        } catch {}
+    }, [slug])
 
-  useEffect(() => {
-    loadPinyinInitialsFromDB()
-    fetchPlazaCategories().then(setCategories).catch(() => {})
-  }, [])
-
-  // ── JS 安全模式：检测 has_js 并恢复 localStorage 偏好 ──
-  const handleJsChoice = useCallback((mode: 'safe' | 'js', dismiss: boolean) => {
-    setJsMode(mode)
-    setShowDialog(false)
-    if (dismiss && slug) {
-      try {
-        localStorage.setItem(`plaza_js_dismiss_${slug}`, mode)
-      } catch { /* 忽略 */ }
-    }
-  }, [slug])
-
-  const toggleJsMode = useCallback(() => {
-    setJsMode((prev) => (prev === 'js' ? 'safe' : 'js'))
-  }, [])
-
-  useEffect(() => {
-    if (!article) return
-    void (async () => {
-      const articleHasJs = article.has_js === true
-      setHasJs(articleHasJs)
-
-      if (!articleHasJs) {
-        setJsMode('safe')
-        return
-      }
-
-      if (editing) {
-        // 编辑模式不需要弹窗
-        setJsMode('safe')
-        return
-      }
-
-      // JS 页面：检查 localStorage 是否有偏好
-      try {
-        const stored = localStorage.getItem(`plaza_js_dismiss_${slug}`)
-        if (stored === 'safe' || stored === 'js') {
-          setJsMode(stored)
-          return
-        }
-      } catch { /* 忽略 */ }
-
-      // 无存储偏好 → 显示弹窗
-      setShowDialog(true)
-    })()
-  }, [article, slug, editing])
-
-  // ── 编辑草稿恢复 ──
-  useEffect(() => {
-    if (!slug) return
-    void (async () => {
-      interface DraftData {
-        title: string
-        content: string
-        isPublic: boolean
-        hasJs: boolean
-      }
-      const draft = loadDraft<DraftData>(`plaza_edit_${slug}`)
-      if (draft) {
-        if (draft.title) setEditTitle(draft.title)
-        if (draft.content) setEditContent(draft.content)
-        if (draft.isPublic !== undefined) setEditIsPublic(draft.isPublic)
-        if (draft.hasJs !== undefined) setEditHasJs(draft.hasJs)
-      }
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在挂载时恢复一次草稿
-  }, [])
-
-  // 编辑模式自动保存草稿
-  const editHasContent = editTitle.trim() !== '' || editContent.trim() !== ''
-  const { clearDraft: clearEditDraft } = useAutoSave({
-    key: `plaza_edit_${slug}`,
-    data: { title: editTitle, content: editContent, isPublic: editIsPublic, hasJs: editHasJs },
-    enabled: editing && editHasContent,
-  })
-
-  const isAuthor = session && article && session.userId === article.author_id
-  const isAdmin = session && ['admin', 'super_admin'].includes(session.role)
-
-  // 奖励积分弹窗
-  const [showAwardModal, setShowAwardModal] = useState(false)
-  const [awardAmount, setAwardAmount] = useState(30)
-  const [awardSubmitting, setAwardSubmitting] = useState(false)
-  const [awardResult, setAwardResult] = useState<{ success: boolean; text: string } | null>(null)
-
-  const handleAwardSubmit = async () => {
-    if (!article || awardAmount <= 0) return
-    setAwardSubmitting(true)
-    setAwardResult(null)
-    try {
-      const ok = await awardPlazaArticlePoints(article.id, awardAmount)
-      if (ok) {
-        setAwardResult({ success: true, text: `成功奖励 ${awardAmount} 积分` })
-        setTimeout(() => setShowAwardModal(false), 1000)
-      } else {
-        setAwardResult({ success: false, text: '奖励失败' })
-      }
-    } catch (e: unknown) {
-      setAwardResult({ success: false, text: e instanceof Error && e.message ? e.message : '奖励失败' })
-    } finally {
-      setAwardSubmitting(false)
-    }
-  }
-
-  // 投币弹窗
-  const [showTipModal, setShowTipModal] = useState(false)
-  const [tipAmount, setTipAmount] = useState(5)
-  const [tipCustom, setTipCustom] = useState(false)
-  const [tipSubmitting, setTipSubmitting] = useState(false)
-  const [tipResult, setTipResult] = useState<{ success: boolean; text: string } | null>(null)
-
-  const handleTipSubmit = async () => {
-    if (!article || tipAmount <= 0) return
-    setTipSubmitting(true)
-    setTipResult(null)
-    try {
-      const ok = await tipPlazaArticle(article.id, tipAmount)
-      if (ok) {
-        setTipResult({ success: true, text: `成功投币 ${tipAmount} 积分` })
-        setArticle((prev) => prev ? { ...prev, tip_count: (prev.tip_count ?? 0) + tipAmount } : prev)
-        setTimeout(() => setShowTipModal(false), 1000)
-      } else {
-        setTipResult({ success: false, text: '投币失败' })
-      }
-    } catch (e: unknown) {
-      setTipResult({ success: false, text: e instanceof Error && e.message ? e.message : '投币失败' })
-    } finally {
-      setTipSubmitting(false)
-    }
-  }
-
-  const startEdit = () => {
-    if (!article) return
-    setEditTitle(article.title)
-    setEditContent(article.content)
-    setEditIsPublic(article.is_public)
-    setEditHasJs(article.has_js === true)
-    setEditing(true)
-  }
-
-  const cancelEdit = () => {
-    setEditing(false)
-    setEditTitle('')
-    setEditContent('')
-    setEditIsPublic(true)
-    setEditHasJs(false)
-    clearEditDraft()
-  }
-
-  const submitEdit = async () => {
-    if (!article || !editTitle.trim() || !editContent.trim() || submitting) return
-    setSubmitting(true)
-    try {
-      await updatePlazaArticle(
-        article.id,
-        editTitle.trim(),
-        editContent.trim(),
-        article.category_id,
-        editIsPublic,
-        editHasJs,
-      )
-      clearEditDraft()
-      setEditing(false)
-      setArticle((prev) =>
-        prev
-          ? { ...prev, title: editTitle.trim(), content: editContent.trim(), is_public: editIsPublic, has_js: editHasJs }
-          : null,
-      )
-    } catch (e: unknown) {
-      showWarningToast(e instanceof Error && e.message ? e.message : '编辑失败')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!window.confirm('确定要删除这篇文章吗？此操作不可撤销。')) return
-    try {
-      await deletePlazaArticle(article!.id)
-      router.push('/plaza')
-    } catch (e: unknown) {
-      showWarningToast(e instanceof Error && e.message ? e.message : '删除失败')
-    }
-  }
-
-  const handleVote = async (type: 'up' | 'down') => {
-    if (!article) return
-    // 乐观更新：立即反映 UI
-    const prevVote = myVote
-    setArticle((p) => {
-      if (!p) return p
-      const next = { ...p }
-      // 撤销之前的投票（如果有）
-      if (prevVote === 'up') next.like_count = Math.max(0, (next.like_count ?? 0) - 1)
-      if (prevVote === 'down') next.downvote_count = Math.max(0, (next.downvote_count ?? 0) - 1)
-      if (type !== prevVote) {
-        // 新投票
-        if (type === 'up') next.like_count = (next.like_count ?? 0) + 1
-        if (type === 'down') next.downvote_count = (next.downvote_count ?? 0) + 1
-        setMyVote(type)
-      } else {
-        setMyVote(null)
-      }
-      return next
+    // 赞/踩乐观更新
+    const { handleVote } = useOptimisticVote<PlazaArticleDetail>({
+        item: article,
+        setItem: setArticle,
+        myVote,
+        setMyVote,
+        getId: (a) => a.id,
+        readCounts: (a) => ({ up: a.like_count ?? 0, down: a.downvote_count ?? 0 }),
+        writeCounts: (a, c) => ({ ...a, like_count: c.up, downvote_count: c.down }),
+        vote: votePlazaArticle,
+        removeVote: removePlazaVote,
+        refresh: refreshArticle,
     })
-    try {
-      if (myVote === type) {
-        await removePlazaVote(article.id)
-      } else {
-        await votePlazaArticle(article.id, type)
-      }
-      // 后台同步确保一致性
-      refreshArticle()
-    } catch {
-      // 回滚
-      setMyVote(prevVote)
-      refreshArticle()
+
+    // ── 注入沙箱 JS 全局 API：window.plazaAPI ──
+    // 每个 sandbox iframe（同源）内的桥接脚本会把自身 window.plazaAPI 指向这里，
+    // 并把 setWindowHeight 替换为基于 frameElement 的实现。
+    useEffect(() => {
+        if (!article) return
+        const api: PlazaAPI = {
+            getUserInfo: async () => {
+                const s = getSession()
+                if (!s) return null
+                const totalPoints = await fetchMyPoints()
+                return { username: s.username, student_id: s.studentId, total_points: totalPoints }
+            },
+            setWindowHeight: () => {
+                // 真实实现由 SandboxBox 注入 iframe 的桥接脚本负责（frameElement 定位自身 iframe），
+                // 父页面该方法为 no-op，避免误用（无 iframe 上下文无法定位目标）。
+            },
+            sendPoints: (amount, cap, floor, once = false) =>
+                sendPlazaPoints(article.id, amount, cap, floor, once),
+            getArticleTips: () => fetchPlazaArticleTips(article.id),
+            storage: {
+                getItem: (key) => getPlazaStorage(article.id, key),
+                setItem: (key, value) => setPlazaStorage(article.id, key, value),
+            },
+        }
+        window.plazaAPI = api
+        return () => {
+            if (window.plazaAPI === api) delete window.plazaAPI
+        }
+    }, [article])
+
+    useEffect(() => {
+        loadPinyinInitialsFromDB()
+        fetchPlazaCategories().then(setCategories).catch(() => {})
+    }, [])
+
+    // ── JS 安全模式：检测 has_js 并恢复 localStorage 偏好 ──
+    const handleJsChoice = useCallback((mode: 'safe' | 'js', dismiss: boolean) => {
+        setJsMode(mode)
+        setShowDialog(false)
+        if (dismiss && slug) {
+            try {
+                localStorage.setItem(`plaza_js_dismiss_${slug}`, mode)
+            } catch { /* 忽略 */ }
+        }
+    }, [slug])
+
+    const toggleJsMode = useCallback(() => {
+        setJsMode((prev) => (prev === 'js' ? 'safe' : 'js'))
+    }, [])
+
+    useEffect(() => {
+        if (!article) return
+        void (async () => {
+            const articleHasJs = article.has_js === true
+            setHasJs(articleHasJs)
+
+            if (!articleHasJs) {
+                setJsMode('safe')
+                return
+            }
+
+            if (editing) {
+                // 编辑模式不需要弹窗
+                setJsMode('safe')
+                return
+            }
+
+            // JS 页面：检查 localStorage 是否有偏好
+            try {
+                const stored = localStorage.getItem(`plaza_js_dismiss_${slug}`)
+                if (stored === 'safe' || stored === 'js') {
+                    setJsMode(stored)
+                    return
+                }
+            } catch { /* 忽略 */ }
+
+            // 无存储偏好 → 显示弹窗
+            setShowDialog(true)
+        })()
+    }, [article, slug, editing])
+
+    // ── 编辑草稿恢复 ──
+    useEffect(() => {
+        if (!slug) return
+        void (async () => {
+            interface DraftData {
+                title: string
+                content: string
+                isPublic: boolean
+                hasJs: boolean
+            }
+            const draft = loadDraft<DraftData>(`plaza_edit_${slug}`)
+            if (draft) {
+                if (draft.title) setEditTitle(draft.title)
+                if (draft.content) setEditContent(draft.content)
+                if (draft.isPublic !== undefined) setEditIsPublic(draft.isPublic)
+                if (draft.hasJs !== undefined) setEditHasJs(draft.hasJs)
+            }
+        })()
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在挂载时恢复一次草稿
+    }, [])
+
+    // 编辑模式自动保存草稿
+    const editHasContent = editTitle.trim() !== '' || editContent.trim() !== ''
+    const { clearDraft: clearEditDraft } = useAutoSave({
+        key: `plaza_edit_${slug}`,
+        data: { title: editTitle, content: editContent, isPublic: editIsPublic, hasJs: editHasJs },
+        enabled: editing && editHasContent,
+    })
+
+    const isAuthor = session && article && session.userId === article.author_id
+    const isAdmin = session && ['admin', 'super_admin'].includes(session.role)
+
+    const startEdit = () => {
+        if (!article) return
+        setEditTitle(article.title)
+        setEditContent(article.content)
+        setEditIsPublic(article.is_public)
+        setEditHasJs(article.has_js === true)
+        setEditing(true)
     }
-  }
 
-  /** 局部刷新文章（更新 comment_count 等） */
-  const refreshArticle = useCallback(async () => {
-    if (!slug) return
-    try {
-      const a = await fetchPlazaArticle(slug)
-      setArticle(a)
-    } catch {}
-  }, [slug])
+    const cancelEdit = () => {
+        setEditing(false)
+        setEditTitle('')
+        setEditContent('')
+        setEditIsPublic(true)
+        setEditHasJs(false)
+        clearEditDraft()
+    }
 
-  // 提取标题用于 TOC（必须在早期 return 之前，保证 hooks 数量一致）
-  const articleHtml = useMemo(() => {
-    if (!article?.content) return ''
-    try {
-      const md = createMarkdown({ highlight: true, texmath: true, anchor: true })
-      return md.render(article.content)
-    } catch { return '' }
-  }, [article])
+    const submitEdit = async () => {
+        if (!article || !editTitle.trim() || !editContent.trim() || submitting) return
+        setSubmitting(true)
+        try {
+            await updatePlazaArticle(
+                article.id,
+                editTitle.trim(),
+                editContent.trim(),
+                article.category_id,
+                editIsPublic,
+                editHasJs,
+            )
+            clearEditDraft()
+            setEditing(false)
+            setArticle((prev) =>
+                prev
+                    ? { ...prev, title: editTitle.trim(), content: editContent.trim(), is_public: editIsPublic, has_js: editHasJs }
+                    : null,
+            )
+        } catch (e: unknown) {
+            showWarningToast(e instanceof Error && e.message ? e.message : '编辑失败')
+        } finally {
+            setSubmitting(false)
+        }
+    }
 
-  const headings: Heading[] = useMemo(
-    () => extractHeadingsFromHtml(articleHtml),
-    [articleHtml],
-  )
+    const handleDelete = async () => {
+        if (!window.confirm('确定要删除这篇文章吗？此操作不可撤销。')) return
+        try {
+            await deletePlazaArticle(article!.id)
+            router.push('/plaza')
+        } catch (e: unknown) {
+            showWarningToast(e instanceof Error && e.message ? e.message : '删除失败')
+        }
+    }
 
-  if (!slug) return <div className={styles.page}><p className={styles.loading}>缺少文章标识</p></div>
-  if (loading) return <div className={styles.page}><p className={styles.loading}>加载中…</p></div>
-  if (error) return <div className={styles.page}><p className={styles.error}>❌ {error}</p></div>
-  if (!article) return <div className={styles.page}><p className={styles.error}>❌ 文章不存在</p></div>
+    // 提取标题用于 TOC（必须在早期 return 之前，保证 hooks 数量一致）
+    const articleHtml = useMemo(() => {
+        if (!article?.content) return ''
+        try {
+            const md = createMarkdown({ highlight: true, texmath: true, anchor: true })
+            return md.render(article.content)
+        } catch { return '' }
+    }, [article])
 
-  return (
-    <>
-      {/* TOC 可见时右侧让位，标题栏与正文在剩余窗口居中（同 wiki 的 page-content 方案） */}
-      <div className={pd.tocWrap}>
-      <div className={pd.detailHeader}>
-        <div className={pd.detailHeaderInner}>
-          <div className={pd.detailTitleRow}>
-            {editing ? (
-              <input
-                className={styles.titleInput}
-                type="text"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                maxLength={100}
-                autoFocus
-              />
-            ) : (
-              <h1 className={pd.detailTitle}>
-                <span dangerouslySetInnerHTML={{ __html: renderMarkdown(article.title) }} />
-                {isAdmin && article.is_awarded && (
-                  <span style={{ fontSize: '0.8rem', opacity: 0.45, marginLeft: 8 }}>
-                    🏅
-                  </span>
-                )}
-              </h1>
-            )}
-            <div style={{ display: 'flex', gap: 4 }}>
-              {isAuthor && !editing && (
-                <>
-                  <button className={pd.backBtnIcon} onClick={startEdit} title="编辑文章">
-                    <FaIcon name="pen" />
-                  </button>
-                  <button
-                    className={pd.backBtnIcon}
-                    onClick={handleDelete}
-                    title="删除文章"
-                    style={{ color: '#dc2626' }}
-                  >
-                    <FaIcon name="times" />
-                  </button>
-                </>
-              )}
-              {isAdmin && !editing && (
-                <button
-                  className={pd.backBtnIcon}
-                  onClick={() => { setShowAwardModal(true); setAwardResult(null) }}
-                  title="奖励积分"
+    const headings: Heading[] = useMemo(
+        () => extractHeadingsFromHtml(articleHtml),
+        [articleHtml],
+    )
+
+    if (!slug) return <div className={styles.page}><p className={styles.loading}>缺少文章标识</p></div>
+    if (loading) return <div className={styles.page}><p className={styles.loading}>加载中…</p></div>
+    if (error) return <div className={styles.page}><p className={styles.error}>❌ {error}</p></div>
+    if (!article) return <div className={styles.page}><p className={styles.error}>❌ 文章不存在</p></div>
+
+    return (
+        <>
+            {/* TOC 可见时右侧让位，标题栏与正文在剩余窗口居中（同 wiki 的 page-content 方案） */}
+            <div className={pd.tocWrap}>
+                <PostDetailShell
+                    title={editing ? (
+                        <input
+                            className={styles.titleInput}
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            maxLength={100}
+                            autoFocus
+                        />
+                    ) : (
+                        <h1 className={pd.detailTitle}>
+                            <span dangerouslySetInnerHTML={{ __html: renderMarkdown(article.title) }} />
+                            {isAdmin && article.is_awarded && (
+                                <span style={{ fontSize: '0.8rem', opacity: 0.45, marginLeft: 8 }}>
+                                    🏅
+                                </span>
+                            )}
+                        </h1>
+                    )}
+                    actions={<>
+                        {isAuthor && !editing && (
+                            <>
+                                <button className={pd.backBtnIcon} onClick={startEdit} title="编辑文章">
+                                    <FaIcon name="pen" />
+                                </button>
+                                <button
+                                    className={pd.backBtnIcon}
+                                    onClick={handleDelete}
+                                    title="删除文章"
+                                    style={{ color: '#dc2626' }}
+                                >
+                                    <FaIcon name="times" />
+                                </button>
+                            </>
+                        )}
+                        {isAdmin && !editing && (
+                            <button
+                                className={pd.backBtnIcon}
+                                onClick={() => setShowAwardModal(true)}
+                                title="奖励积分"
+                            >
+                                <FaIcon name="gift" />
+                            </button>
+                        )}
+                        {hasJs && jsMode && !editing && (
+                            <button
+                                className={pd.backBtnIcon}
+                                onClick={toggleJsMode}
+                                title={jsMode === 'js' ? 'JS 模式（点击切换到安全模式）' : '安全模式（点击切换到原文）'}
+                                style={{
+                                    color: jsMode === 'js' ? '#e74c3c' : undefined,
+                                    opacity: jsMode === 'js' ? 1 : 0.6,
+                                }}
+                            >
+                                <FaIcon name="code" />
+                            </button>
+                        )}
+                        <button
+                            className={pd.backBtnIcon}
+                            onClick={editing ? cancelEdit : () => router.push('/plaza')}
+                            title={editing ? '取消编辑' : '返回列表'}
+                        >
+                            <FaIcon name="chevron-left" />
+                        </button>
+                    </>}
+                    meta={<>
+                        <UserName username={article.author_username} userId={article.author_id} className={pd.detailAuthor} />
+                        <span>发布于 {formatDate(article.created_at)}</span>
+                        {article.updated_at !== article.created_at && (
+                            <span>编辑于 {formatDate(article.updated_at)}</span>
+                        )}
+                        <span style={{ color: 'var(--color-text-light)' }}>
+                            {categories.length > 0 && article.category_id
+                                ? getCategoryPathById(categories, article.category_id).join(' · ')
+                                : ''}
+                        </span>
+                        {!article.is_public && (
+                            <span style={{ color: '#b35a00', fontSize: '0.82rem' }}>🔒 私密</span>
+                        )}
+                        {editing && <span style={{ color: 'var(--color-primary)' }}>编辑中</span>}
+                    </>}
                 >
-                  <FaIcon name="gift" />
-                </button>
-              )}
-              {hasJs && jsMode && !editing && (
-                <button
-                  className={pd.backBtnIcon}
-                  onClick={toggleJsMode}
-                  title={jsMode === 'js' ? 'JS 模式（点击切换到安全模式）' : '安全模式（点击切换到原文）'}
-                  style={{
-                    color: jsMode === 'js' ? '#e74c3c' : undefined,
-                    opacity: jsMode === 'js' ? 1 : 0.6,
-                  }}
-                >
-                  <FaIcon name="code" />
-                </button>
-              )}
-              <button
-                className={pd.backBtnIcon}
-                onClick={editing ? cancelEdit : () => router.push('/plaza')}
-                title={editing ? '取消编辑' : '返回列表'}
-              >
-                <FaIcon name="chevron-left" />
-              </button>
+                    {editing ? (
+                        <div className={styles.newPostForm}>
+                            <ToggleField
+                                label="可见性"
+                                checked={editIsPublic}
+                                onChange={setEditIsPublic}
+                                onText="公开（所有人可见）"
+                                offText="私密（仅自己可见）"
+                                padded
+                            />
+
+                            {/* 编辑模式：JS 开关 */}
+                            <ToggleField
+                                label="JavaScript"
+                                tooltip="开启后，读者可选择直接运行页面中的 JavaScript（跳过安全过滤）。仅在您信任内容的情况下使用。"
+                                checked={editHasJs}
+                                onChange={setEditHasJs}
+                                onText="开启"
+                                offText="关闭"
+                                padded
+                            />
+
+                            <div className={styles.editorWrapper} style={{ minHeight: '300px' }}>
+                                <MarkdownEditor value={editContent} onChange={setEditContent} className={styles.editorNoBorder} noSanitizePreview={editHasJs} />
+                            </div>
+                            <div className={styles.formActions}>
+                                <button className={`${styles.btn} ${styles.btnOutline}`} onClick={cancelEdit}>
+                                    取消
+                                </button>
+                                <button
+                                    className={`${styles.btn} ${styles.btnPrimary}`}
+                                    onClick={submitEdit}
+                                    disabled={submitting}
+                                >
+                                    {submitting ? '保存中…' : '保存'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className={pd.detail}>
+                            <div className={pd.detailBody}>
+                                <WikiContent content={article.content} className="wiki-body" noSanitize={jsMode === 'js'} format="markdown" />
+                            </div>
+
+                            {/* 点赞栏 + 投币入口 */}
+                            <VoteBar
+                                up={article.like_count ?? 0}
+                                down={article.downvote_count ?? 0}
+                                myVote={myVote}
+                                onVote={handleVote}
+                            >
+                                {session && !editing && (
+                                    <button
+                                        className={pd.voteIcon}
+                                        onClick={isAuthor ? undefined : () => setShowTipModal(true)}
+                                        title="投币"
+                                        style={{ opacity: isAuthor ? 0.4 : 1, cursor: isAuthor ? 'default' : 'pointer' }}
+                                    >
+                                        <FaIcon name="coins" />
+                                    </button>
+                                )}
+                                <span className={pd.voteCount}>{article.tip_count ?? 0}</span>
+                            </VoteBar>
+
+                            {/* 评论区 */}
+                            <CommentSection source="plaza" targetId={article.id} title="评论" />
+                        </div>
+                    )}
+                </PostDetailShell>
             </div>
-          </div>
-          <div className={pd.detailMeta}>
-            <UserName username={article.author_username} userId={article.author_id} className={pd.detailAuthor} />
-            <span>发布于 {formatDate(article.created_at)}</span>
-            {article.updated_at !== article.created_at && (
-              <span>编辑于 {formatDate(article.updated_at)}</span>
+
+            {/* TOC */}
+            <TableOfContents headings={headings} />
+
+            {/* 奖励积分弹窗 */}
+            <PointsAmountModal
+                open={showAwardModal}
+                onClose={() => setShowAwardModal(false)}
+                title="🏆 奖励积分"
+                subtitle={<>作者：{article.author_username}</>}
+                presets={[10, 30, 50]}
+                initialAmount={30}
+                maxAmount={999}
+                busyLabel="发放中…"
+                confirmLabel={(n) => `确认奖励 ${n} 分`}
+                successText={(n) => `成功奖励 ${n} 积分`}
+                fallbackError="奖励失败"
+                onSubmit={(amount) => awardPlazaArticlePoints(article.id, amount)}
+            />
+
+            {/* 投币弹窗 */}
+            <PointsAmountModal
+                open={showTipModal}
+                onClose={() => setShowTipModal(false)}
+                title="🪙 投币"
+                subtitle={<>打赏 {article.author_username} — 消耗你的积分</>}
+                presets={TIP_PRESETS}
+                allowCustom
+                initialAmount={5}
+                maxAmount={9999}
+                busyLabel="发送中…"
+                confirmLabel={(n) => `确认投币 ${n} 分`}
+                successText={(n) => `成功投币 ${n} 积分`}
+                fallbackError="投币失败"
+                onSubmit={(amount) => tipPlazaArticle(article.id, amount)}
+                onSuccess={(amount) =>
+                    setArticle((prev) => (prev ? { ...prev, tip_count: (prev.tip_count ?? 0) + amount } : prev))
+                }
+            />
+
+            {/* JS 安全警告弹窗 */}
+            {showDialog && (
+                <JSSafetyDialog onChoice={handleJsChoice} />
             )}
-            <span style={{ color: 'var(--color-text-light)' }}>
-              {categories.length > 0 && article.category_id
-                ? getCategoryPathById(categories, article.category_id).join(' · ')
-                : ''}
-            </span>
-            {!article.is_public && (
-              <span style={{ color: '#b35a00', fontSize: '0.82rem' }}>🔒 私密</span>
-            )}
-            {editing && <span style={{ color: 'var(--color-primary)' }}>编辑中</span>}
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.page} style={{ paddingTop: 0 }}>
-        {editing ? (
-          <div className={styles.newPostForm}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px' }}>
-              <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-                可见性
-              </span>
-              <div
-                className={styles.toggleSwitch + (editIsPublic ? '' : ' ' + styles.toggleOn)}
-                onClick={() => setEditIsPublic(!editIsPublic)}
-                role="switch"
-                aria-checked={editIsPublic}
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditIsPublic(!editIsPublic) } }}
-              >
-                <div className={styles.toggleSlider} />
-              </div>
-              <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
-                {editIsPublic ? '公开（所有人可见）' : '私密（仅自己可见）'}
-              </span>
-            </div>
-
-            {/* 编辑模式：JS 开关 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px' }}>
-              <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-                JavaScript
-                <span
-                  title="开启后，读者可选择直接运行页面中的 JavaScript（跳过安全过滤）。仅在您信任内容的情况下使用。"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    border: '1px solid var(--color-border, #ddd)',
-                    fontSize: '0.65rem',
-                    cursor: 'help',
-                    color: 'var(--color-text-secondary, #999)',
-                    marginLeft: 4,
-                    verticalAlign: 'middle',
-                  }}
-                >
-                  ?
-                </span>
-              </span>
-              <div
-                className={styles.toggleSwitch + (editHasJs ? ' ' + styles.toggleOn : '')}
-                onClick={() => setEditHasJs(!editHasJs)}
-                role="switch"
-                aria-checked={editHasJs}
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditHasJs(!editHasJs) } }}
-              >
-                <div className={styles.toggleSlider} />
-              </div>
-              <span style={{ fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
-                {editHasJs ? '开启' : '关闭'}
-              </span>
-            </div>
-
-            <div className={styles.editorWrapper} style={{ minHeight: '300px' }}>
-              <MarkdownEditor value={editContent} onChange={setEditContent} className={styles.editorNoBorder} noSanitizePreview={editHasJs} />
-            </div>
-            <div className={styles.formActions}>
-              <button className={`${styles.btn} ${styles.btnOutline}`} onClick={cancelEdit}>
-                取消
-              </button>
-              <button
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={submitEdit}
-                disabled={submitting}
-              >
-                {submitting ? '保存中…' : '保存'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className={pd.detail}>
-            <div className={pd.detailBody}>
-              <WikiContent content={article.content} className="wiki-body" noSanitize={jsMode === 'js'} format="markdown" />
-            </div>
-
-            {/* 点赞栏 */}
-            <div className={pd.voteBar}>
-              <button className={`${pd.voteIcon} ${myVote === 'up' ? pd.voteIconActiveUp : ''}`}
-                onClick={() => handleVote('up')} title="赞"><FaIcon name="thumbs-up" /></button>
-              <span className={`${pd.voteCount} ${(article.like_count ?? 0) > 0 ? pd.voteCountPositive : ''}`}>{article.like_count ?? 0}</span>
-              <button className={`${pd.voteIcon} ${myVote === 'down' ? pd.voteIconActiveDown : ''}`}
-                onClick={() => handleVote('down')} title="踩"><FaIcon name="thumbs-down" /></button>
-              <span className={`${pd.voteCount} ${(article.downvote_count ?? 0) > 0 ? pd.voteCountNegative : ''}`}>{article.downvote_count ?? 0}</span>
-              {session && !editing && (
-                <button
-                  className={pd.voteIcon}
-                  onClick={isAuthor ? undefined : () => { setShowTipModal(true); setTipResult(null); setTipCustom(false) }}
-                  title="投币"
-                  style={{ opacity: isAuthor ? 0.4 : 1, cursor: isAuthor ? 'default' : 'pointer' }}
-                >
-                  <FaIcon name="coins" />
-                </button>
-              )}
-              <span className={pd.voteCount}>{article.tip_count ?? 0}</span>
-            </div>
-
-            {/* 评论区 */}
-            <CommentSection source="plaza" targetId={article.id} title="评论" />
-          </div>
-        )}
-      </div>
-      </div>
-
-      {/* TOC */}
-      <TableOfContents headings={headings} />
-
-      {/* 奖励积分弹窗 */}
-      {showAwardModal && (
-        <div className={pointsStyles.awardModal} onClick={() => setShowAwardModal(false)}>
-          <div className={pointsStyles.awardCard} onClick={(e) => e.stopPropagation()}>
-            <div className={pointsStyles.awardHeader}>
-              <h3>🏆 奖励积分</h3>
-              <button className={pointsStyles.awardClose} onClick={() => setShowAwardModal(false)}>✕</button>
-            </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: 12 }}>
-              作者：{article.author_username}
-            </p>
-            <div className={pointsStyles.awardPresets}>
-              {[10, 30, 50].map((v) => (
-                <button
-                  key={v}
-                  className={`${pointsStyles.awardPreset} ${awardAmount === v ? pointsStyles.awardPresetActive : ''}`}
-                  onClick={() => setAwardAmount(v)}
-                >
-                  {v} 分
-                </button>
-              ))}
-            </div>
-            <div className={pointsStyles.awardField}>
-              <label>积分数量</label>
-              <input
-                type="number"
-                min={1}
-                max={999}
-                value={awardAmount}
-                onChange={(e) => setAwardAmount(Number(e.target.value) || 0)}
-              />
-            </div>
-            <button
-              className={pointsStyles.awardSubmit}
-              onClick={handleAwardSubmit}
-              disabled={awardSubmitting || awardAmount <= 0}
-            >
-              {awardSubmitting ? '发放中…' : `确认奖励 ${awardAmount} 分`}
-            </button>
-            {awardResult && (
-              <div className={`${pointsStyles.awardResult} ${awardResult.success ? pointsStyles.awardSuccess : pointsStyles.awardError}`}>
-                {awardResult.text}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 投币弹窗 */}
-      {showTipModal && (
-        <div className={pointsStyles.awardModal} onClick={() => setShowTipModal(false)}>
-          <div className={pointsStyles.awardCard} onClick={(e) => e.stopPropagation()}>
-            <div className={pointsStyles.awardHeader}>
-              <h3>🪙 投币</h3>
-              <button className={pointsStyles.awardClose} onClick={() => setShowTipModal(false)}>✕</button>
-            </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: 12 }}>
-              打赏 {article?.author_username} — 消耗你的积分
-            </p>
-            <div className={pointsStyles.awardPresets}>
-              {TIP_PRESETS.map((v) => (
-                <button
-                  key={v}
-                  className={`${pointsStyles.awardPreset} ${!tipCustom && tipAmount === v ? pointsStyles.awardPresetActive : ''}`}
-                  onClick={() => { setTipAmount(v); setTipCustom(false) }}
-                >
-                  {v} 分
-                </button>
-              ))}
-              <button
-                className={`${pointsStyles.awardPreset} ${tipCustom ? pointsStyles.awardPresetActive : ''}`}
-                onClick={() => { setTipCustom(true); setTipAmount(0) }}
-              >
-                自定义
-              </button>
-            </div>
-            {tipCustom && (
-              <div className={pointsStyles.awardField}>
-                <label>积分数量</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={9999}
-                  value={tipAmount || ''}
-                  onChange={(e) => setTipAmount(Number(e.target.value) || 0)}
-                  autoFocus
-                />
-              </div>
-            )}
-            <button
-              className={pointsStyles.awardSubmit}
-              onClick={handleTipSubmit}
-              disabled={tipSubmitting || tipAmount <= 0}
-            >
-              {tipSubmitting ? '发送中…' : `确认投币 ${tipAmount} 分`}
-            </button>
-            {tipResult && (
-              <div className={`${pointsStyles.awardResult} ${tipResult.success ? pointsStyles.awardSuccess : pointsStyles.awardError}`}>
-                {tipResult.text}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* JS 安全警告弹窗 */}
-      {showDialog && (
-        <JSSafetyDialog onChoice={handleJsChoice} />
-      )}
-    </>
-  )
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return '刚刚'
-  if (mins < 60) return `${mins} 分钟前`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs} 小时前`
-  const days = Math.floor(hrs / 24)
-  if (days < 30) return `${days} 天前`
-  return d.toLocaleDateString('zh-CN')
+        </>
+    )
 }

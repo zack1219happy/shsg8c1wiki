@@ -1,569 +1,453 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import FaIcon from '@/components/FaIcon'
 import { UserName } from '@/components/UserName'
 import { getSession } from '@/lib/auth'
 import {
-  fetchPendingRevisions,
-  fetchRevisionDetail,
-  approveWikiRevision,
-  rejectWikiRevision,
-  fetchPendingPageRequests,
-  fetchPageRequestDetail,
-  approvePageRequest,
-  rejectPageRequest,
-  type WikiRevision,
-  type RevisionDetail,
-  type PageRequest,
-  type PageRequestDetail,
+    fetchPendingRevisions,
+    fetchRevisionDetail,
+    approveWikiRevision,
+    rejectWikiRevision,
+    fetchPendingPageRequests,
+    fetchPageRequestDetail,
+    approvePageRequest,
+    rejectPageRequest,
+    type WikiRevision,
+    type RevisionDetail,
+    type PageRequest,
+    type PageRequestDetail,
 } from '@/lib/wiki-api'
 import { lineDiff, type DiffLine } from '@/lib/diff'
+import { useReviewFlow } from '@/hooks/useReviewFlow'
 import styles from '@/styles/admin.module.css'
 import forumStyles from '@/styles/forum.module.css'
 
 const MarkdownEditor = dynamic(
-  () => import('@/components/MarkdownEditor').then((m) => m.MarkdownEditor),
-  { ssr: false },
+    () => import('@/components/MarkdownEditor').then((m) => m.MarkdownEditor),
+    { ssr: false },
 )
 
 export default function AdminRevisionsPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const tab = searchParams.get('tab') || 'revisions'
-  const selectedId = searchParams.get('id') || ''
-  const prSelectedId = searchParams.get('rid') || ''
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const tab = searchParams.get('tab') || 'revisions'
+    const selectedId = searchParams.get('id') || ''
+    const prSelectedId = searchParams.get('rid') || ''
 
-  const [session] = useState(getSession())
+    const [session] = useState(getSession())
+    const isAdmin = !!session && ['admin', 'super_admin'].includes(session.role)
 
-  // ── 编辑审核状态 ──
-  const [revisions, setRevisions] = useState<WikiRevision[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [detail, setDetail] = useState<RevisionDetail | null>(null)
-  const [detailLoading, setDetailLoading] = useState(true)
-  const [editContent, setEditContent] = useState('')
-  const [reviewComment, setReviewComment] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const diffRef = useRef<HTMLDivElement>(null)
+    // ── 编辑修订审核流 ──
+    const revisions = useReviewFlow<WikiRevision, RevisionDetail>({
+        active: true,
+        enabled: isAdmin,
+        selectedId,
+        fetchList: fetchPendingRevisions,
+        fetchDetail: fetchRevisionDetail,
+        initDraft: (d) => ({ content: d.content }),
+        onSettled: () => router.replace('/admin/revisions'),
+    })
+    const { draft: revDraft, setDraft: setRevDraft, comment: revComment, setComment: setRevComment } = revisions
 
-  // ── 新建页面审核状态 ──
-  const [prList, setPrList] = useState<PageRequest[]>([])
-  const [prLoading, setPrLoading] = useState(true)
-  const [prError, setPrError] = useState<string | null>(null)
-  const [prDetail, setPrDetail] = useState<PageRequestDetail | null>(null)
-  const [prDetailLoading, setPrDetailLoading] = useState(true)
-  const [prEditTitle, setPrEditTitle] = useState('')
-  const [prEditContent, setPrEditContent] = useState('')
-  const [prReviewComment, setPrReviewComment] = useState('')
-  const [prSubmitting, setPrSubmitting] = useState(false)
+    // ── 新建页面请求审核流 ──
+    const requests = useReviewFlow<PageRequest, PageRequestDetail>({
+        active: tab === 'requests',
+        enabled: isAdmin,
+        selectedId: prSelectedId,
+        fetchList: fetchPendingPageRequests,
+        fetchDetail: fetchPageRequestDetail,
+        initDraft: (d) => ({ title: d.title, content: d.content }),
+        onSettled: () => router.replace('/admin/revisions?tab=requests'),
+    })
+    const { draft: prDraft, setDraft: setPrDraft, comment: prComment, setComment: setPrComment } = requests
 
-  const isAdmin = session && ['admin', 'super_admin'].includes(session.role)
+    // ── Diff（仅编辑修订）──
+    const diffLines: DiffLine[] = useMemo(() => {
+        if (!revisions.detail) return []
+        return lineDiff(revisions.detail.current_content, revDraft.content)
+    }, [revisions.detail, revDraft.content])
 
-  // ── 渲染期重置加载状态（URL 参数变化时切回加载态，避免在 effect 中同步 setState）──
-  const [prevSelectedId, setPrevSelectedId] = useState(selectedId)
-  if (prevSelectedId !== selectedId) {
-    setPrevSelectedId(selectedId)
-    setDetailLoading(true)
-  }
-  const [prevReqTab, setPrevReqTab] = useState(tab)
-  if (prevReqTab !== tab) {
-    setPrevReqTab(tab)
-    setPrLoading(true)
-  }
-  const prDetailKey = prSelectedId + '|' + tab
-  const [prevPrDetailKey, setPrevPrDetailKey] = useState(prDetailKey)
-  if (prevPrDetailKey !== prDetailKey) {
-    setPrevPrDetailKey(prDetailKey)
-    setPrDetailLoading(true)
-  }
+    const diffRef = useRef<HTMLDivElement>(null)
+    const handleDiffLineClick = useCallback((line: DiffLine) => {
+        const el = diffRef.current
+        if (!el) return
+        const targetLine = line.type === 'add' ? line.newLine : line.oldLine
+        if (!targetLine) return
+        const lineHeight = 22
+        el.scrollTo({ top: (targetLine - 5) * lineHeight, behavior: 'smooth' })
+    }, [])
 
-  // ── 编辑审核：加载待审列表 ──
-  useEffect(() => {
-    if (!isAdmin) return
-    fetchPendingRevisions()
-      .then(setRevisions)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [isAdmin])
+    // ── 操作 ──
+    const approveRevision = () =>
+        revisions.act('approve', (id, d, _c, cur) => approveWikiRevision(id, { content: d.content.trim() || cur.content }))
+    const rejectRevision = () =>
+        revisions.act('reject', (id, _d, c) => rejectWikiRevision(id, c.trim()))
+    const approveRequest = () =>
+        requests.act('approve', (id, d, _c, cur) =>
+            approvePageRequest(id, { title: d.title.trim() || cur.title, content: d.content.trim() || cur.content }))
+    const rejectRequest = () =>
+        requests.act('reject', (id, _d, c) => rejectPageRequest(id, c.trim()))
 
-  // ── 编辑审核：加载修订详情 ──
-  useEffect(() => {
-    if (!selectedId || !isAdmin) return
-    fetchRevisionDetail(selectedId)
-      .then((d) => {
-        setDetail(d)
-        if (d) setEditContent(d.content)
-      })
-      .catch(() => setDetail(null))
-      .finally(() => setDetailLoading(false))
-  }, [selectedId, isAdmin])
+    const selectRevision = useCallback((id: string) => {
+        revisions.open(id)
+        router.replace(`/admin/revisions?id=${id}`)
+    }, [revisions, router])
 
-  // ── 新建页面审核：加载待审列表 ──
-  useEffect(() => {
-    if (!isAdmin || tab !== 'requests') return
-    fetchPendingPageRequests()
-      .then(setPrList)
-      .catch((e) => setPrError(e.message))
-      .finally(() => setPrLoading(false))
-  }, [isAdmin, tab])
+    const selectPr = useCallback((id: string) => {
+        requests.open(id)
+        router.replace(`/admin/revisions?tab=requests&rid=${id}`)
+    }, [requests, router])
 
-  // ── 新建页面审核：加载请求详情 ──
-  useEffect(() => {
-    if (!prSelectedId || !isAdmin || tab !== 'requests') return
-    fetchPageRequestDetail(prSelectedId)
-      .then((d) => {
-        setPrDetail(d)
-        if (d) {
-          setPrEditTitle(d.title)
-          setPrEditContent(d.content)
+    const backToList = useCallback(() => {
+        revisions.close()
+        router.replace('/admin/revisions')
+    }, [revisions, router])
+
+    const backToPrList = useCallback(() => {
+        requests.close()
+        router.replace('/admin/revisions?tab=requests')
+    }, [requests, router])
+
+    const switchTab = useCallback((t: string) => {
+        revisions.close()
+        requests.close()
+        const suffix = t === 'requests' ? '?tab=requests' : ''
+        router.replace(`/admin/revisions${suffix}`)
+    }, [revisions, requests, router])
+
+    if (!session) return <div className={styles.page}><p className={styles.error}>请先登录</p></div>
+    if (!isAdmin) return <div className={styles.page}><p className={styles.error}>无权限</p></div>
+
+    // ==============================================================
+    //  渲染：审核管理
+    // ==============================================================
+    return (
+        <div className={styles.page}>
+            <div className={forumStyles.header}>
+                <h2><FaIcon name="gavel" /> 审核管理</h2>
+            </div>
+
+            {/* ── Tab 导航 ── */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid var(--color-border)', paddingBottom: 8 }}>
+                <TabButton active={tab !== 'requests'} onClick={() => switchTab('revisions')}>
+                    <FaIcon name="pen" /> 编辑审核
+                </TabButton>
+                <TabButton active={tab === 'requests'} onClick={() => switchTab('requests')}>
+                    <FaIcon name="plus" /> 新建页面审核
+                </TabButton>
+            </div>
+
+            {tab === 'requests' ? renderPrPanel() : renderRevisionPanel()}
+        </div>
+    )
+
+    // ==============================================================
+    //  编辑审核面板（详情含双栏编辑器 + Diff）
+    // ==============================================================
+    function renderRevisionPanel() {
+        const { detail, detailLoading } = revisions
+        if (selectedId) {
+            if (detailLoading) return <p className={styles.loading}>加载中…</p>
+            if (!detail) return (
+                <>
+                    <p className={styles.error}>❌ 修订不存在</p>
+                    <button className={`${forumStyles.btn} ${forumStyles.btnOutline}`} onClick={backToList}>← 返回列表</button>
+                </>
+            )
+
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', minHeight: '60vh' }}>
+                    {/* header */}
+                    <div className={forumStyles.detailHeader}>
+                        <div className={forumStyles.detailHeaderInner}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <h2 className={forumStyles.detailTitle}>
+                                        审核：{detail.page_title}
+                                        {detail.is_conflict && <span style={{ marginLeft: 10, fontSize: '0.9rem', color: '#c2410c' }}>⚠️ 冲突</span>}
+                                    </h2>
+                                    <div className={forumStyles.detailMeta}>
+                                        <UserName username={detail.author_username} userId={detail.author_id} />
+                                        <span>提交于 {formatTime(detail.created_at)}</span>
+                                        <span>基于 #{detail.base_revision}，当前 #{detail.current_revision}</span>
+                                    </div>
+                                </div>
+                                <button className={forumStyles.backBtnIcon} onClick={backToList} title="返回列表">
+                                    <FaIcon name="chevron-left" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 双栏编辑器 + Diff */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div className={styles.editorDiffLayout}>
+                            <div className={styles.editorPane}>
+                                <MarkdownEditor value={revDraft.content} onChange={(v) => setRevDraft({ ...revDraft, content: v })} className={styles.editorInner} />
+                            </div>
+                            <div className={styles.diffPane}>
+                                <div className={styles.diffPaneBody} ref={diffRef}>
+                                    {diffLines.length === 0 ? (
+                                        <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-light)' }}>无差异</div>
+                                    ) : (
+                                        diffLines.map((line, i) => (
+                                            <div
+                                                key={i}
+                                                className={`${styles.diffLine} ${line.type === 'add' ? styles.diffLineAdd : line.type === 'del' ? styles.diffLineDel : ''}`}
+                                                onClick={() => handleDiffLineClick(line)}
+                                            >
+                                                <span className={styles.diffLineNum}>
+                                                    {line.type === 'del' ? line.oldLine : line.type === 'add' ? line.newLine : line.oldLine}
+                                                </span>
+                                                <span className={`${styles.diffLinePrefix} ${line.type === 'add' ? styles.diffLinePrefixAdd : line.type === 'del' ? styles.diffLinePrefixDel : ''}`}>
+                                                    {line.type === 'add' ? '+' : line.type === 'del' ? '−' : ' '}
+                                                </span>
+                                                <span className={styles.diffLineContent}>{line.value || ' '}</span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <ReviewActionBar
+                            comment={revComment} onCommentChange={setRevComment}
+                            onReject={rejectRevision} onApprove={approveRevision}
+                            submitting={revisions.submitting}
+                        />
+                    </div>
+                </div>
+            )
         }
-      })
-      .catch(() => setPrDetail(null))
-      .finally(() => setPrDetailLoading(false))
-  }, [prSelectedId, isAdmin, tab])
 
-  // ── Diff ──
-  const diffLines: DiffLine[] = useMemo(() => {
-    if (!detail) return []
-    return lineDiff(detail.current_content, editContent)
-  }, [detail, editContent])
-
-  const handleDiffLineClick = useCallback((line: DiffLine) => {
-    const el = diffRef.current
-    if (!el) return
-    const targetLine = line.type === 'add' ? line.newLine : line.oldLine
-    if (!targetLine) return
-    const lineHeight = 22
-    el.scrollTo({ top: (targetLine - 5) * lineHeight, behavior: 'smooth' })
-  }, [])
-
-  // ── 编辑审核：批准 ──
-  const handleApprove = useCallback(async () => {
-    if (!detail || submitting) return
-    setSubmitting(true)
-    try {
-      await approveWikiRevision(detail.id, { content: editContent.trim() || detail.content })
-      const updated = await fetchPendingRevisions()
-      setRevisions(updated)
-      setDetail(null)
-      setReviewComment('')
-      router.replace('/admin/revisions')
-    } catch (e) {
-      window.alert('批准失败: ' + ((e as { message?: string })?.message || '未知错误'))
-    } finally {
-      setSubmitting(false)
+        // ── 列表模式 ──
+        const { items, loading, error } = revisions
+        return (
+            <>
+                {loading ? (
+                    <p className={styles.loading}>加载中…</p>
+                ) : error ? (
+                    <p className={styles.error}>❌ {error}</p>
+                ) : items.length === 0 ? (
+                    <div className={styles.empty}>
+                        <div className={styles.emptyIcon}>✅</div>
+                        <div className={styles.emptyText}>没有待审核的编辑</div>
+                    </div>
+                ) : (
+                    <div className={styles.revisionList}>
+                        {items.map((rev) => (
+                            <div
+                                key={rev.id}
+                                className={`${styles.revisionCard} ${rev.is_conflict ? styles.revisionCardConflict : ''}`}
+                                onClick={() => selectRevision(rev.id)}
+                            >
+                                <div className={styles.revisionInfo}>
+                                    <div className={styles.revisionTitle}>
+                                        {rev.title}
+                                        {rev.is_conflict && <span className={`${styles.badge} ${styles.badgeConflict}`} style={{ marginLeft: 8 }}>基于旧版本</span>}
+                                    </div>
+                                    <div className={styles.revisionMeta}>
+                                        <UserName username={rev.author_username} userId={rev.author_id} />
+                                        <span>在</span>
+                                        <span className={styles.revisionPage}>{rev.page_title}</span>
+                                        <span>· {formatTime(rev.created_at)}</span>
+                                        <span>· #{rev.base_revision}→#{rev.current_revision}</span>
+                                    </div>
+                                </div>
+                                <div className={styles.revisionActions}>
+                                    <span className={`${styles.badge} ${styles.badgePending}`}>待审核</span>
+                                    <FaIcon name="chevron-right" className={styles.chevron} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </>
+        )
     }
-  }, [detail, editContent, submitting, router])
 
-  // ── 编辑审核：驳回 ──
-  const handleReject = useCallback(async () => {
-    if (!detail || submitting) return
-    if (!reviewComment.trim() && !window.confirm('没有填写反馈意见，确定要驳回吗？')) return
-    setSubmitting(true)
-    try {
-      await rejectWikiRevision(detail.id, reviewComment.trim())
-      const updated = await fetchPendingRevisions()
-      setRevisions(updated)
-      setDetail(null)
-      setReviewComment('')
-      router.replace('/admin/revisions')
-    } catch (e) {
-      window.alert('驳回失败: ' + ((e as { message?: string })?.message || '未知错误'))
-    } finally {
-      setSubmitting(false)
-    }
-  }, [detail, reviewComment, submitting, router])
+    // ==============================================================
+    //  新建页面审核面板（详情为标题 + 编辑器，无 Diff）
+    // ==============================================================
+    function renderPrPanel() {
+        const { detail, detailLoading } = requests
+        if (prSelectedId) {
+            if (detailLoading) return <p className={styles.loading}>加载中…</p>
+            if (!detail) return (
+                <>
+                    <p className={styles.error}>❌ 请求不存在</p>
+                    <button className={`${forumStyles.btn} ${forumStyles.btnOutline}`} onClick={backToPrList}>← 返回列表</button>
+                </>
+            )
 
-  // ── 新建页面审核：批准 ──
-  const handlePrApprove = useCallback(async () => {
-    if (!prDetail || prSubmitting) return
-    setPrSubmitting(true)
-    try {
-      await approvePageRequest(prDetail.id, { title: prEditTitle.trim() || prDetail.title, content: prEditContent.trim() || prDetail.content })
-      const updated = await fetchPendingPageRequests()
-      setPrList(updated)
-      setPrDetail(null)
-      setPrReviewComment('')
-      router.replace('/admin/revisions?tab=requests')
-    } catch (e) {
-      window.alert('批准失败: ' + ((e as { message?: string })?.message || '未知错误'))
-    } finally {
-      setPrSubmitting(false)
-    }
-  }, [prDetail, prEditTitle, prEditContent, prSubmitting, router])
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', minHeight: '60vh' }}>
+                    {/* header */}
+                    <div className={forumStyles.detailHeader}>
+                        <div className={forumStyles.detailHeaderInner}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <h2 className={forumStyles.detailTitle}>
+                                        审核新建页面：{detail.title}
+                                    </h2>
+                                    <div className={forumStyles.detailMeta}>
+                                        <UserName username={detail.author_username} userId={detail.author_id} />
+                                        <span>提交于 {formatTime(detail.created_at)}</span>
+                                        <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--color-primary)' }}>
+                                            /wiki/{detail.slug}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button className={forumStyles.backBtnIcon} onClick={backToPrList} title="返回列表">
+                                    <FaIcon name="chevron-left" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
-  // ── 新建页面审核：驳回 ──
-  const handlePrReject = useCallback(async () => {
-    if (!prDetail || prSubmitting) return
-    if (!prReviewComment.trim() && !window.confirm('没有填写反馈意见，确定要驳回吗？')) return
-    setPrSubmitting(true)
-    try {
-      await rejectPageRequest(prDetail.id, prReviewComment.trim())
-      const updated = await fetchPendingPageRequests()
-      setPrList(updated)
-      setPrDetail(null)
-      setPrReviewComment('')
-      router.replace('/admin/revisions?tab=requests')
-    } catch (e) {
-      window.alert('驳回失败: ' + ((e as { message?: string })?.message || '未知错误'))
-    } finally {
-      setPrSubmitting(false)
-    }
-  }, [prDetail, prReviewComment, prSubmitting, router])
+                    {/* 编辑器 */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 12 }}>
+                        <input
+                            className={forumStyles.titleInput}
+                            type="text"
+                            placeholder="页面标题"
+                            value={prDraft.title}
+                            onChange={(e) => setPrDraft({ ...prDraft, title: e.target.value })}
+                            style={{ fontSize: '0.95rem' }}
+                        />
 
-  const selectRevision = useCallback((id: string) => {
-    setReviewComment('')
-    router.replace(`/admin/revisions?id=${id}`)
-  }, [router])
+                        <div className={forumStyles.editorWrapper} style={{ minHeight: 300 }}>
+                            <MarkdownEditor
+                                value={prDraft.content}
+                                onChange={(v) => setPrDraft({ ...prDraft, content: v })}
+                                className={forumStyles.editorNoBorder}
+                            />
+                        </div>
+                    </div>
 
-  const selectPr = useCallback((id: string) => {
-    setPrReviewComment('')
-    router.replace(`/admin/revisions?tab=requests&rid=${id}`)
-  }, [router])
-
-  const backToList = useCallback(() => {
-    setDetail(null)
-    router.replace('/admin/revisions')
-  }, [router])
-
-  const backToPrList = useCallback(() => {
-    setPrDetail(null)
-    router.replace('/admin/revisions?tab=requests')
-  }, [router])
-
-  const switchTab = useCallback((t: string) => {
-    setDetail(null)
-    setPrDetail(null)
-    const suffix = t === 'requests' ? '?tab=requests' : ''
-    router.replace(`/admin/revisions${suffix}`)
-  }, [router])
-
-  if (!session) return <div className={styles.page}><p className={styles.error}>请先登录</p></div>
-  if (!isAdmin) return <div className={styles.page}><p className={styles.error}>无权限</p></div>
-
-  // ==============================================================
-  //  渲染：审核管理
-  // ==============================================================
-  return (
-    <div className={styles.page}>
-      <div className={forumStyles.header}>
-        <h2><FaIcon name="gavel" /> 审核管理</h2>
-      </div>
-
-      {/* ── Tab 导航 ── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid var(--color-border)', paddingBottom: 8 }}>
-        <TabButton active={tab !== 'requests'} onClick={() => switchTab('revisions')}>
-          <FaIcon name="pen" /> 编辑审核
-        </TabButton>
-        <TabButton active={tab === 'requests'} onClick={() => switchTab('requests')}>
-          <FaIcon name="plus" /> 新建页面审核
-        </TabButton>
-      </div>
-
-      {tab === 'requests' ? renderPrPanel() : renderRevisionPanel()}
-    </div>
-  )
-
-  // ==============================================================
-  //  编辑审核面板
-  // ==============================================================
-  function renderRevisionPanel() {
-    if (selectedId) {
-      if (detailLoading) return <p className={styles.loading}>加载中…</p>
-      if (!detail) return (
-        <>
-          <p className={styles.error}>❌ 修订不存在</p>
-          <button className={`${forumStyles.btn} ${forumStyles.btnOutline}`} onClick={backToList}>← 返回列表</button>
-        </>
-      )
-
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '60vh' }}>
-          {/* header */}
-          <div className={forumStyles.detailHeader}>
-            <div className={forumStyles.detailHeaderInner}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2 className={forumStyles.detailTitle}>
-                    审核：{detail.page_title}
-                    {detail.is_conflict && <span style={{ marginLeft: 10, fontSize: '0.9rem', color: '#c2410c' }}>⚠️ 冲突</span>}
-                  </h2>
-                  <div className={forumStyles.detailMeta}>
-                    <UserName username={detail.author_username} userId={detail.author_id} />
-                    <span>提交于 {formatTime(detail.created_at)}</span>
-                    <span>基于 #{detail.base_revision}，当前 #{detail.current_revision}</span>
-                  </div>
+                    <ReviewActionBar
+                        comment={prComment} onCommentChange={setPrComment}
+                        onReject={rejectRequest} onApprove={approveRequest}
+                        submitting={requests.submitting}
+                    />
                 </div>
-                <button className={forumStyles.backBtnIcon} onClick={backToList} title="返回列表">
-                  <FaIcon name="chevron-left" />
-                </button>
-              </div>
-            </div>
-          </div>
+            )
+        }
 
-          {/* 双栏编辑器 + Diff */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div className={styles.editorDiffLayout}>
-              <div className={styles.editorPane}>
-                <MarkdownEditor value={editContent} onChange={setEditContent} className={styles.editorInner} />
-              </div>
-              <div className={styles.diffPane}>
-                <div className={styles.diffPaneBody} ref={diffRef}>
-                  {diffLines.length === 0 ? (
-                    <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-light)' }}>无差异</div>
-                  ) : (
-                    diffLines.map((line, i) => (
-                      <div
-                        key={i}
-                        className={`${styles.diffLine} ${line.type === 'add' ? styles.diffLineAdd : line.type === 'del' ? styles.diffLineDel : ''}`}
-                        onClick={() => handleDiffLineClick(line)}
-                      >
-                        <span className={styles.diffLineNum}>
-                          {line.type === 'del' ? line.oldLine : line.type === 'add' ? line.newLine : line.oldLine}
-                        </span>
-                        <span className={`${styles.diffLinePrefix} ${line.type === 'add' ? styles.diffLinePrefixAdd : line.type === 'del' ? styles.diffLinePrefixDel : ''}`}>
-                          {line.type === 'add' ? '+' : line.type === 'del' ? '−' : ' '}
-                        </span>
-                        <span className={styles.diffLineContent}>{line.value || ' '}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
+        // ── 列表模式 ──
+        const { items, loading, error } = requests
+        return (
+            <>
+                {loading ? (
+                    <p className={styles.loading}>加载中…</p>
+                ) : error ? (
+                    <p className={styles.error}>❌ {error}</p>
+                ) : items.length === 0 ? (
+                    <div className={styles.empty}>
+                        <div className={styles.emptyIcon}>📭</div>
+                        <div className={styles.emptyText}>没有待审核的新建页面请求</div>
+                    </div>
+                ) : (
+                    <div className={styles.revisionList}>
+                        {items.map((req) => (
+                            <div
+                                key={req.id}
+                                className={styles.revisionCard}
+                                onClick={() => selectPr(req.id)}
+                            >
+                                <div className={styles.revisionInfo}>
+                                    <div className={styles.revisionTitle}>
+                                        <span style={{ marginRight: 6, fontSize: '0.8rem' }}><FaIcon name="plus" /></span>
+                                        {req.title}
+                                    </div>
+                                    <div className={styles.revisionMeta}>
+                                        <UserName username={req.author_username} userId={req.author_id} />
+                                        <span>新建</span>
+                                        <span className={styles.revisionPage}>{req.slug}</span>
+                                        <span>· {formatTime(req.created_at)}</span>
+                                    </div>
+                                </div>
+                                <div className={styles.revisionActions}>
+                                    <span className={`${styles.badge} ${styles.badgePending}`}>待审核</span>
+                                    <FaIcon name="chevron-right" className={styles.chevron} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </>
+        )
+    }
+}
 
-            {/* 底部操作 */}
-            <div style={{ display: 'flex', gap: 8, padding: '12px 0', alignItems: 'center' }}>
-              <input
+// ── 底部操作条：反馈意见 + 驳回 + 批准 ──
+function ReviewActionBar({ comment, onCommentChange, onReject, onApprove, submitting }: {
+    comment: string
+    onCommentChange: (v: string) => void
+    onReject: () => void
+    onApprove: () => void
+    submitting: boolean
+}) {
+    return (
+        <div style={{ display: 'flex', gap: 8, padding: '12px 0', alignItems: 'center' }}>
+            <input
                 className={forumStyles.titleInput}
                 type="text"
                 placeholder="反馈意见（可选）…"
-                value={reviewComment}
-                onChange={(e) => setReviewComment(e.target.value)}
+                value={comment}
+                onChange={(e) => onCommentChange(e.target.value)}
                 style={{ flex: 1, fontSize: '0.85rem' }}
-              />
-              <button className={`${forumStyles.btn} ${forumStyles.btnOutline}`} onClick={handleReject} disabled={submitting}>
+            />
+            <button className={`${forumStyles.btn} ${forumStyles.btnOutline}`} onClick={onReject} disabled={submitting}>
                 {submitting ? '处理中…' : '驳回'}
-              </button>
-              <button className={`${forumStyles.btn} ${forumStyles.btnPrimary}`} onClick={handleApprove} disabled={submitting}>
+            </button>
+            <button className={`${forumStyles.btn} ${forumStyles.btnPrimary}`} onClick={onApprove} disabled={submitting}>
                 {submitting ? '处理中…' : '批准'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    // ── 列表模式 ──
-    return (
-      <>
-        {loading ? (
-          <p className={styles.loading}>加载中…</p>
-        ) : error ? (
-          <p className={styles.error}>❌ {error}</p>
-        ) : revisions.length === 0 ? (
-          <div className={styles.empty}>
-            <div className={styles.emptyIcon}>✅</div>
-            <div className={styles.emptyText}>没有待审核的编辑</div>
-          </div>
-        ) : (
-          <div className={styles.revisionList}>
-            {revisions.map((rev) => (
-              <div
-                key={rev.id}
-                className={`${styles.revisionCard} ${rev.is_conflict ? styles.revisionCardConflict : ''}`}
-                onClick={() => selectRevision(rev.id)}
-              >
-                <div className={styles.revisionInfo}>
-                  <div className={styles.revisionTitle}>
-                    {rev.title}
-                    {rev.is_conflict && <span className={`${styles.badge} ${styles.badgeConflict}`} style={{ marginLeft: 8 }}>基于旧版本</span>}
-                  </div>
-                  <div className={styles.revisionMeta}>
-                    <UserName username={rev.author_username} userId={rev.author_id} />
-                    <span>在</span>
-                    <span className={styles.revisionPage}>{rev.page_title}</span>
-                    <span>· {formatTime(rev.created_at)}</span>
-                    <span>· #{rev.base_revision}→#{rev.current_revision}</span>
-                  </div>
-                </div>
-                <div className={styles.revisionActions}>
-                  <span className={`${styles.badge} ${styles.badgePending}`}>待审核</span>
-                  <FaIcon name="chevron-right" className={styles.chevron} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </>
-    )
-  }
-
-  // ==============================================================
-  //  新建页面审核面板
-  // ==============================================================
-  function renderPrPanel() {
-    if (prSelectedId) {
-      if (prDetailLoading) return <p className={styles.loading}>加载中…</p>
-      if (!prDetail) return (
-        <>
-          <p className={styles.error}>❌ 请求不存在</p>
-          <button className={`${forumStyles.btn} ${forumStyles.btnOutline}`} onClick={backToPrList}>← 返回列表</button>
-        </>
-      )
-
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '60vh' }}>
-          {/* header */}
-          <div className={forumStyles.detailHeader}>
-            <div className={forumStyles.detailHeaderInner}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2 className={forumStyles.detailTitle}>
-                    审核新建页面：{prDetail.title}
-                  </h2>
-                  <div className={forumStyles.detailMeta}>
-                    <UserName username={prDetail.author_username} userId={prDetail.author_id} />
-                    <span>提交于 {formatTime(prDetail.created_at)}</span>
-                    <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--color-primary)' }}>
-                      /wiki/{prDetail.slug}
-                    </span>
-                  </div>
-                </div>
-                <button className={forumStyles.backBtnIcon} onClick={backToPrList} title="返回列表">
-                  <FaIcon name="chevron-left" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* 编辑器 */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 12 }}>
-            <input
-              className={forumStyles.titleInput}
-              type="text"
-              placeholder="页面标题"
-              value={prEditTitle}
-              onChange={(e) => setPrEditTitle(e.target.value)}
-              style={{ fontSize: '0.95rem' }}
-            />
-
-            <div className={forumStyles.editorWrapper} style={{ minHeight: 300 }}>
-              <MarkdownEditor
-                value={prEditContent}
-                onChange={setPrEditContent}
-                className={forumStyles.editorNoBorder}
-              />
-            </div>
-          </div>
-
-          {/* 底部操作 */}
-          <div style={{ display: 'flex', gap: 8, padding: '12px 0', alignItems: 'center' }}>
-            <input
-              className={forumStyles.titleInput}
-              type="text"
-              placeholder="反馈意见（可选）…"
-              value={prReviewComment}
-              onChange={(e) => setPrReviewComment(e.target.value)}
-              style={{ flex: 1, fontSize: '0.85rem' }}
-            />
-            <button className={`${forumStyles.btn} ${forumStyles.btnOutline}`} onClick={handlePrReject} disabled={prSubmitting}>
-              {prSubmitting ? '处理中…' : '驳回'}
             </button>
-            <button className={`${forumStyles.btn} ${forumStyles.btnPrimary}`} onClick={handlePrApprove} disabled={prSubmitting}>
-              {prSubmitting ? '处理中…' : '批准'}
-            </button>
-          </div>
         </div>
-      )
-    }
-
-    // ── 列表模式 ──
-    return (
-      <>
-        {prLoading ? (
-          <p className={styles.loading}>加载中…</p>
-        ) : prError ? (
-          <p className={styles.error}>❌ {prError}</p>
-        ) : prList.length === 0 ? (
-          <div className={styles.empty}>
-            <div className={styles.emptyIcon}>📭</div>
-            <div className={styles.emptyText}>没有待审核的新建页面请求</div>
-          </div>
-        ) : (
-          <div className={styles.revisionList}>
-            {prList.map((req) => (
-              <div
-                key={req.id}
-                className={styles.revisionCard}
-                onClick={() => selectPr(req.id)}
-              >
-                <div className={styles.revisionInfo}>
-                  <div className={styles.revisionTitle}>
-                    <span style={{ marginRight: 6, fontSize: '0.8rem' }}><FaIcon name="plus" /></span>
-                    {req.title}
-                  </div>
-                  <div className={styles.revisionMeta}>
-                    <UserName username={req.author_username} userId={req.author_id} />
-                    <span>新建</span>
-                    <span className={styles.revisionPage}>{req.slug}</span>
-                    <span>· {formatTime(req.created_at)}</span>
-                  </div>
-                </div>
-                <div className={styles.revisionActions}>
-                  <span className={`${styles.badge} ${styles.badgePending}`}>待审核</span>
-                  <FaIcon name="chevron-right" className={styles.chevron} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </>
     )
-  }
-
 }
 
 // ── Tab 按钮组件 ──
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '8px 16px',
-        border: 'none',
-        borderRadius: 'var(--border-radius) var(--border-radius) 0 0',
-        fontSize: '0.88rem',
-        fontWeight: active ? 600 : 400,
-        cursor: 'pointer',
-        background: active ? 'var(--color-primary)' : 'transparent',
-        color: active ? '#fff' : 'var(--color-text-secondary)',
-        transition: 'background 0.15s, color 0.15s',
-        position: 'relative',
-        bottom: -9,
-      }}
-    >
-      {children}
-    </button>
-  )
+    return (
+        <button
+            onClick={onClick}
+            style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 16px',
+                border: 'none',
+                borderRadius: 'var(--border-radius) var(--border-radius) 0 0',
+                fontSize: '0.88rem',
+                fontWeight: active ? 600 : 400,
+                cursor: 'pointer',
+                background: active ? 'var(--color-primary)' : 'transparent',
+                color: active ? '#fff' : 'var(--color-text-secondary)',
+                transition: 'background 0.15s, color 0.15s',
+                position: 'relative',
+                bottom: -9,
+            }}
+        >
+            {children}
+        </button>
+    )
 }
 
 function formatTime(dateStr: string): string {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return '刚刚'
-  if (mins < 60) return `${mins} 分钟前`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs} 小时前`
-  const days = Math.floor(hrs / 24)
-  if (days < 30) return `${days} 天前`
-  return d.toLocaleDateString('zh-CN')
+    const d = new Date(dateStr)
+    const now = new Date()
+    const diff = now.getTime() - d.getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return '刚刚'
+    if (mins < 60) return `${mins} 分钟前`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs} 小时前`
+    const days = Math.floor(hrs / 24)
+    if (days < 30) return `${days} 天前`
+    return d.toLocaleDateString('zh-CN')
 }
