@@ -3,198 +3,133 @@
 import { forwardRef, useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { getSession, canDeleteComment } from '@/lib/auth'
-import type { Comment as WikiComment } from '@/types/gist'
+import type { CommentSource, UnifiedComment } from '@/lib/gist-api'
+import { fetchComments, addComment, deleteComment } from '@/lib/gist-api'
 import { formatDate } from '@/lib/forum'
 import { useCommentAnchor } from '@/hooks/useCommentAnchor'
 import { UserName } from '@/components/UserName'
 import { useUserById } from '@/lib/user-colors'
 import { showWarningToast } from '@/lib/toast'
 import WikiContent from '@/components/WikiContent'
+import FaIcon from '@/components/FaIcon'
 import commentStyles from '@/styles/comment.module.css'
 
 // ============================================================
-// 统一评论类型 — wiki Comment 和 ForumComment 的抽象
-// ============================================================
-
-export interface UnifiedComment {
-  id: string
-  parentId: string | null
-  author: string
-  /** 用于删除权限判断的 userId。可选，为空时仅 admin 可删 */
-  authorId?: string
-  content: string
-  createdAt: string
-  deleted: boolean
-}
-
-// ============================================================
-// Props
+// 全站统一评论区 — 唯一用法：
+//   <CommentSection source="forum" targetId={postId} />
+// 组件自取数据、解析 ?comment= 锚点、提供刷新按钮。
 // ============================================================
 
 interface CommentSectionProps {
-  /**
-   * 评论数据。带 pageSlug 时进入「自取模式」：组件自动从 gist-api
-   * 获取/添加/删除评论。不带时进入「受控模式」：完全由外界管理数据。
-   */
-  pageSlug?: string
-  /** 受控模式：外界提供的评论列表 */
-  comments?: UnifiedComment[]
-  /** 受控模式：添加评论 */
-  onSubmit?: (content: string, parentId?: string) => Promise<void>
-  /** 受控模式：删除评论 */
-  onDelete?: (commentId: string) => Promise<void>
-
-  /** 评论锚点滚动（直接跳转到某条评论） */
-  targetCommentId?: string | null
-  /** 触发锚点滚动刷新的 key */
-  scrollKey?: number
-  /** 隐藏默认的标题栏（由父组件自定义） */
+  /** 评论来源板块 */
+  source: CommentSource
+  /** 目标：wiki 页面 slug / 帖子 id / 文章 id / 许愿 id / 主页主人 userId */
+  targetId: string
+  /** 标题文字（hideTitle=false 时显示，默认「评论区」） */
+  title?: string
+  /** 隐藏标题（宿主页面自带标题时用；刷新按钮仍保留） */
   hideTitle?: boolean
-  /** 额外拥有删除权的人（如主页主人可删他人留言） */
-  extraDeleteUserId?: string
+  /**
+   * 锚点重扫信号：该值变化时组件重新解析 URL 的 ?comment= 参数。
+   * 同页导航（如 mypage 切换用户）时由宿主传入以触发重滚。
+   */
+  scrollKey?: string | number
 }
 
-// ============================================================
-// 主组件
-// ============================================================
-
 export default function CommentSection({
-  pageSlug,
-  comments: externalComments,
-  onSubmit: externalOnSubmit,
-  onDelete: externalOnDelete,
-  targetCommentId: externalTargetId,
-  scrollKey: externalScrollKey,
+  source,
+  targetId,
+  title,
   hideTitle,
-  extraDeleteUserId,
+  scrollKey = 0,
 }: CommentSectionProps) {
-  // ---- 自取模式 vs 受控模式 ----
-  const isSelfManaged = !!pageSlug
-  const [localComments, setLocalComments] = useState<UnifiedComment[]>([])
-  // 自取模式初始即为加载中（避免挂载后闪"暂无评论"再切"加载中"）
-  const [loading, setLoading] = useState(isSelfManaged)
+  const [comments, setComments] = useState<UnifiedComment[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [replyTarget, setReplyTarget] = useState<{ id: string; author: string; authorId?: string } | null>(null)
+  // 手动刷新（10s 冷却）
+  const [refreshCooldown, setRefreshCooldown] = useState(0)
+  const [spinning, setSpinning] = useState(false)
 
-  // 自取模式：pageSlug/isSelfManaged 变化时重置加载状态（渲染期调整，替代 effect 内同步 setState）
-  const [loadSyncPrev, setLoadSyncPrev] = useState<{
-    pageSlug?: string
-    isSelfManaged: boolean
-  }>({ pageSlug, isSelfManaged })
-  if (
-    loadSyncPrev.pageSlug !== pageSlug ||
-    loadSyncPrev.isSelfManaged !== isSelfManaged
-  ) {
-    setLoadSyncPrev({ pageSlug, isSelfManaged })
-    if (isSelfManaged) {
-      setLoading(true)
-      setError(null)
-      setReplyTarget(null)
-    }
-  }
-
-  const comments = useMemo(
-    () => (isSelfManaged ? localComments : (externalComments ?? [])),
-    [isSelfManaged, localComments, externalComments],
-  )
   const session = getSession()
 
-  // 锚点：自取模式从 URL 解析，受控模式从 props 读取
-  const [urlCommentId, setUrlCommentId] = useState<string | null>(null)
-  const [urlNonce, setUrlNonce] = useState(0)
-
-  // URL 参数 → 状态同步（渲染期调整：首帧及 pageSlug/isSelfManaged 变化时执行）
-  const [urlSyncPrev, setUrlSyncPrev] = useState<{
-    pageSlug?: string
-    isSelfManaged: boolean
-  } | null>(null)
-  if (
-    urlSyncPrev === null ||
-    urlSyncPrev.pageSlug !== pageSlug ||
-    urlSyncPrev.isSelfManaged !== isSelfManaged
-  ) {
-    setUrlSyncPrev({ pageSlug, isSelfManaged })
-    if (isSelfManaged && typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      const commentId = params.get('comment')
-      if (commentId) {
-        setUrlCommentId(commentId)
-        setUrlNonce((n) => n + 1)
-      } else {
-        setUrlCommentId(null)
-      }
+  // ---- URL 锚点解析 ----
+  // source/targetId/scrollKey 任一变化时重新读取 ?comment=
+  const [anchor, setAnchor] = useState<{ id: string | null; nonce: number }>({ id: null, nonce: 0 })
+  const [syncPrev, setSyncPrev] = useState<string | null>(null)
+  const syncKey = `${source}|${targetId}|${scrollKey}`
+  if (syncPrev !== syncKey) {
+    setSyncPrev(syncKey)
+    if (typeof window !== 'undefined') {
+      const commentId = new URLSearchParams(window.location.search).get('comment')
+      setAnchor((prev) => ({ id: commentId, nonce: prev.nonce + 1 }))
+    } else {
+      setAnchor((prev) => ({ id: null, nonce: prev.nonce + 1 }))
     }
+    setLoading(true)
+    setError(null)
+    setReplyTarget(null)
   }
 
-  const effectiveTargetId = isSelfManaged ? urlCommentId : externalTargetId
-  const effectiveScrollKey = isSelfManaged ? urlNonce : (externalScrollKey ?? 0)
-  const anchorRef = useCommentAnchor(commentStyles.highlight, effectiveScrollKey)
+  const anchorRef = useCommentAnchor(commentStyles.highlight, anchor.nonce)
 
-  // ---- 自取模式下的数据初始化 ----
+  // ---- 数据加载 ----
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchComments(source, targetId)
+      setComments(data)
+      setError(null)
+    } catch (e: unknown) {
+      setError((e as { message?: string } | null)?.message ?? '加载评论失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [source, targetId])
+
+  // 通过微任务触发，避免在 effect 内同步调用含 setState 的函数
+  useEffect(() => { Promise.resolve().then(() => load()) }, [load])
+
+  // 目标评论不存在时警告（通知深链指向已删评论）
   useEffect(() => {
-    if (!isSelfManaged) return
-    let cancelled = false
-
-    import('@/lib/gist-api').then(({ fetchPageComments }) =>
-      fetchPageComments(pageSlug!)
-        .then((data) => {
-          if (cancelled) return
-          setLocalComments(normalizeWikiComments(data))
-        })
-        .catch((e: Error) => {
-          if (cancelled) return
-          setError(e.message ?? '加载评论失败')
-        })
-        .finally(() => { if (!cancelled) setLoading(false) })
-    )
-
-    return () => { cancelled = true }
-  }, [pageSlug, isSelfManaged])
-
-  // 自取模式：目标评论不存在时警告
-  useEffect(() => {
-    if (loading || !urlCommentId) return
-    const match = comments.find((c) => c.id === urlCommentId)
+    if (loading || !anchor.id) return
+    const match = comments.find((c) => c.id === anchor.id)
     if (!match || match.deleted) showWarningToast('该评论可能已被删除')
-  }, [loading, urlCommentId, comments])
+  }, [loading, anchor.id, comments])
 
   // ---- 操作 ----
 
   const handleSubmit = useCallback(async (content: string, parentId?: string) => {
-    if (isSelfManaged && pageSlug) {
-      const { addComment, fetchPageComments } = await import('@/lib/gist-api')
-      const session = getSession()
-      await addComment(pageSlug, {
-        author: session?.username || '匿名',
-        content,
-        parentId,
-      })
-      setReplyTarget(null)
-      const data = await fetchPageComments(pageSlug)
-      setLocalComments(normalizeWikiComments(data))
-      window.dispatchEvent(new CustomEvent('new-notification'))
-    } else if (externalOnSubmit) {
-      await externalOnSubmit(content, parentId)
-      setReplyTarget(null)
-    }
-  }, [isSelfManaged, pageSlug, externalOnSubmit])
+    await addComment(source, targetId, content, parentId)
+    setReplyTarget(null)
+    await load()
+    window.dispatchEvent(new CustomEvent('new-notification'))
+  }, [source, targetId, load])
 
   const handleDelete = useCallback(async (commentId: string) => {
-    if (isSelfManaged && pageSlug) {
-      const { deleteComment, fetchPageComments } = await import('@/lib/gist-api')
-      await deleteComment(commentId)
-      const data = await fetchPageComments(pageSlug)
-      setLocalComments(normalizeWikiComments(data))
-    } else if (externalOnDelete) {
-      await externalOnDelete(commentId)
-    }
-  }, [isSelfManaged, pageSlug, externalOnDelete])
+    await deleteComment(commentId)
+    await load()
+  }, [load])
 
+  const handleRefresh = useCallback(async () => {
+    if (refreshCooldown > 0) return
+    setSpinning(true)
+    setRefreshCooldown(10)
+    await load()
+    setSpinning(false)
+    const timer = setInterval(() => {
+      setRefreshCooldown((prev) => {
+        if (prev <= 1) { clearInterval(timer); return 0 }
+        return prev - 1
+      })
+    }, 1000)
+  }, [refreshCooldown, load])
+
+  // 删除权：作者本人 / 管理员；留言板额外允许主页主人
   const canDelete = useCallback(
     (authorId?: string) =>
       canDeleteComment(session, authorId) ||
-      (extraDeleteUserId != null && session?.userId === extraDeleteUserId),
-    [session, extraDeleteUserId],
+      (source === 'user_page' && session?.userId === targetId),
+    [session, source, targetId],
   )
 
   const handleReplyClick = useCallback((id: string, author: string, authorId?: string) => {
@@ -209,7 +144,20 @@ export default function CommentSection({
 
   return (
     <section className={`${commentStyles.section} ${hideTitle ? commentStyles.sectionNoTitle : ''}`}>
-      {!hideTitle && <h2 className={commentStyles.title}>💬 评论区</h2>}
+      <div className={commentStyles.sectionHeader}>
+        {!hideTitle && (
+          <h2 className={commentStyles.title}>💬 {title ?? '评论区'}</h2>
+        )}
+        <button
+          className={`${commentStyles.refreshBtn} ${refreshCooldown > 0 ? commentStyles.refreshBtnCooling : ''}`}
+          onClick={handleRefresh}
+          disabled={refreshCooldown > 0}
+          title={refreshCooldown > 0 ? `${refreshCooldown}s 后可刷新` : '刷新评论'}
+        >
+          <FaIcon name="sync-alt" spin={spinning} />
+          {refreshCooldown > 0 && <span className={commentStyles.refreshCooldown}>{refreshCooldown}s</span>}
+        </button>
+      </div>
 
       <CommentForm
         onSubmit={handleSubmit}
@@ -230,7 +178,7 @@ export default function CommentSection({
             return (
               <div key={top.id} className={commentStyles.topGroup}>
                 <CommentCard
-                  ref={top.id === effectiveTargetId ? anchorRef : undefined}
+                  ref={top.id === anchor.id ? anchorRef : undefined}
                   comment={top}
                   onReply={handleReplyClick}
                   canDelete={canDelete(top.authorId)}
@@ -241,7 +189,7 @@ export default function CommentSection({
                     {replies.map((r) => (
                       <UnifiedReply
                         key={r.comment.id}
-                        ref={r.comment.id === effectiveTargetId ? anchorRef : undefined}
+                        ref={r.comment.id === anchor.id ? anchorRef : undefined}
                         comment={r.comment}
                         parentAuthor={r.parentAuthor}
                         parentAuthorId={r.parentAuthorId}
@@ -343,22 +291,6 @@ function buildCommentTree(comments: UnifiedComment[]): CommentTree {
   )
 
   return { topLevel, repliesByRoot: rootMap }
-}
-
-// ============================================================
-// 归一化：wiki Comment → UnifiedComment
-// ============================================================
-
-function normalizeWikiComments(raw: WikiComment[]): UnifiedComment[] {
-  return raw.map((c) => ({
-    id: c.id,
-    parentId: c.parentId ?? null,
-    author: c.author,
-    authorId: c.userId,
-    content: c.content,
-    createdAt: c.date,
-    deleted: c.deleted ?? false,
-  }))
 }
 
 // ============================================================

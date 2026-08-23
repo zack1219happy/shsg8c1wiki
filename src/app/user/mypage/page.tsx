@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import FaIcon from '@/components/FaIcon'
 import { UserName } from '@/components/UserName'
 import WikiContent from '@/components/WikiContent'
-import MessageBoard from '@/components/MessageBoard'
+import CommentSection from '@/components/CommentSection'
 import { getSession } from '@/lib/auth'
 import { getPinyinInitials, loadPinyinInitialsFromDB } from '@/lib/people'
 import { supabase } from '@/lib/supabase'
@@ -399,8 +399,7 @@ function UserMypage() {
               privacy={privacy}
               onTogglePrivacy={togglePrivacy}
               stats={stats}
-              targetCommentId={urlCommentId}
-              scrollKey={urlCommentId ? urlCommentId.length : 0}
+              commentAnchorKey={urlCommentId ?? activeQuery}
             />
           )}
           {activeTab === 'posts' && (
@@ -656,7 +655,7 @@ function StatsStrip({
    ============================================================== */
 
 function HomeTab({
-  isSelf, profile, dailyPoints, privacy, onTogglePrivacy, stats, targetCommentId, scrollKey,
+  isSelf, profile, dailyPoints, privacy, onTogglePrivacy, stats, commentAnchorKey,
 }: {
   isSelf: boolean
   profile: UserProfile
@@ -664,8 +663,8 @@ function HomeTab({
   privacy: PrivacySettings
   onTogglePrivacy: (section: keyof PrivacySettings) => void
   stats: UserStats | null
-  targetCommentId: string | null
-  scrollKey: number
+  /** URL 变化信号：评论组件据此重扫 ?comment= 锚点 */
+  commentAnchorKey?: string
 }) {
   return (
     <div className={styles.tabContent}>
@@ -691,10 +690,11 @@ function HomeTab({
         <h3 className={styles.cardTitle}>
           <FaIcon name="comments" /> 留言板
         </h3>
-        <MessageBoard
-          targetUserId={profile.id}
-          targetCommentId={targetCommentId}
-          scrollKey={scrollKey}
+        <CommentSection
+          source="user_page"
+          targetId={profile.id}
+          hideTitle
+          scrollKey={commentAnchorKey}
         />
       </section>
     </div>

@@ -55,7 +55,7 @@ export default async function WikiHomePage() {
 
         <WikiContentDB slug="home" staticContent={content} />
 
-        <CommentSection pageSlug="home" />
+        <CommentSection source="wiki" targetId="home" />
       </article>
 
       <TableOfContents headings={headings} />

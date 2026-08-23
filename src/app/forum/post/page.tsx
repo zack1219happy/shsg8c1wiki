@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import FaIcon from '@/components/FaIcon'
@@ -9,9 +9,6 @@ import { renderClient } from '@/lib/render-client'
 import { getSession } from '@/lib/auth'
 import {
   fetchForumPost,
-  fetchForumComments,
-  addForumComment,
-  deleteForumComment,
   voteForumPost,
   removeForumVote,
   getUserForumVote,
@@ -19,14 +16,12 @@ import {
   fetchAllUsers,
 } from '@/lib/gist-api'
 import CommentSection from '@/components/CommentSection'
-import type { UnifiedComment } from '@/components/CommentSection'
 import VisibilityBar from '@/components/VisibilityBar'
 import VisibilityModal from '@/components/VisibilityModal'
-import type { ForumPost, ForumComment, UserInfo } from '@/types/gist'
+import type { ForumPost, UserInfo } from '@/types/gist'
 import { formatDate } from '@/lib/forum'
 import { UserName } from '@/components/UserName'
 import { loadPinyinInitialsFromDB } from '@/lib/people'
-import { showWarningToast } from '@/lib/toast'
 import { useAutoSave, loadDraft } from '@/hooks/useAutoSave'
 import styles from '@/styles/forum.module.css'
 
@@ -39,11 +34,8 @@ export default function ForumPostPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const postId = searchParams.get('id') || ''
-  const commentId = searchParams.get('comment')
-  const requestKey = useMemo(() => commentId ? searchParams.toString() : '', [searchParams, commentId])
 
   const [post, setPost] = useState<ForumPost | null>(null)
-  const [comments, setComments] = useState<ForumComment[]>([])
   const [loadedPostId, setLoadedPostId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const loading = loadedPostId !== postId
@@ -58,31 +50,19 @@ export default function ForumPostPage() {
   const [allUsers, setAllUsers] = useState<UserInfo[]>([])
   const [usersLoading, setUsersLoading] = useState(true)
   const [showVisibilityModal, setShowVisibilityModal] = useState(false)
-  const [refreshCooldown, setRefreshCooldown] = useState(0)
-  const [spinning, setSpinning] = useState(false)
-  const [scrollReady, setScrollReady] = useState(false)
-
-  /** 有 commentId 时：等所有内容（含动态 MarkdownEditor）加载完毕后再跳转 */
-  useEffect(() => {
-    if (loading || !commentId || scrollReady) return
-    const timer = setTimeout(() => setScrollReady(true), 80)
-    return () => clearTimeout(timer)
-  }, [loading, commentId, scrollReady])
 
   /** 全量加载（首次 / 出错时用） */
   const load = useCallback(() => {
     if (!postId) return
     Promise.all([
       fetchForumPost(postId),
-      fetchForumComments(postId),
       getSession(),
       getUserForumVote(postId).catch(() => null),
     ])
-      .then(([p, c, s, v]) => {
+      .then(([p, s, v]) => {
         setError(null)
         if (!p) { setError('帖子不存在'); return }
         setPost(p)
-        setComments(c)
         setSession(s)
         setMyVote(v)
         fetchAllUsers().then(setAllUsers).catch(() => {}).finally(() => setUsersLoading(false))
@@ -100,15 +80,6 @@ export default function ForumPostPage() {
         getUserForumVote(postId).catch(() => null),
       ])
       if (p) { setPost(p); setMyVote(v) }
-    } catch {}
-  }, [postId])
-
-  /** 局部刷新：只重拉评论列表（评论增删后），不触发 loading */
-  const refreshCommentsOnly = useCallback(async () => {
-    if (!postId) return
-    try {
-      const c = await fetchForumComments(postId)
-      setComments(c)
     } catch {}
   }, [postId])
 
@@ -146,13 +117,6 @@ export default function ForumPostPage() {
     data: { title: editTitle, content: editContent, excludedUserIds: editExcludedIds, agentVisible: editAgentVisible },
     enabled: editing && editHasContent,
   })
-
-  /** 如果 URL 带 ?comment=xxx 但评论不存在或已被删除，显示警告 */
-  useEffect(() => {
-    if (loading || !commentId) return
-    const match = comments.find((c) => c.id === commentId)
-    if (!match || match.deleted) showWarningToast('该评论可能已被删除')
-  }, [loading, commentId, comments])
 
   const handleVote = async (type: 'up' | 'down') => {
     if (!post) return
@@ -218,49 +182,8 @@ export default function ForumPostPage() {
     finally { setSubmitting(false) }
   }
 
-  const handleNewComment = async (content: string, parentId?: string) => {
-    try {
-      await addForumComment(postId, content, parentId)
-      // 只刷新评论列表，不触发全量 loading
-      refreshCommentsOnly()
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : null) }
-  }
-
-  const handleDeleteComment = async (commentId: string) => {
-    try {
-      await deleteForumComment(commentId)
-      // 同时刷新评论和帖子（评论数更新）
-      await Promise.all([refreshCommentsOnly(), refreshPostOnly()])
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : null) }
-  }
-
-  /** 手动刷新评论（10s 冷却） */
-  const handleRefreshComments = useCallback(async () => {
-    if (refreshCooldown > 0) return
-    setSpinning(true)
-    setRefreshCooldown(10)
-    await refreshCommentsOnly()
-    setSpinning(false)
-    // 倒计时冷却
-    const timer = setInterval(() => {
-      setRefreshCooldown((prev) => {
-        if (prev <= 1) { clearInterval(timer); return 0 }
-        return prev - 1
-      })
-    }, 1000)
-  }, [refreshCooldown, refreshCommentsOnly])
-
   const isAuthor = session && post && session.userId === post.author_id
   const editExcludedUsers = allUsers.filter((u) => editExcludedIds.includes(u.id))
-  const unifiedComments = useMemo(() => comments.map((c): UnifiedComment => ({
-    id: c.id,
-    parentId: c.parent_id ?? null,
-    author: c.author_username,
-    authorId: c.author_id,
-    content: c.content,
-    createdAt: c.created_at,
-    deleted: c.deleted,
-  })), [comments])
 
   if (!postId) return <div className={styles.page}><p>缺少帖子 ID</p></div>
   if (loading) return <div className={styles.page}><p className={styles.loading}>加载中&hellip;</p></div>
@@ -343,26 +266,7 @@ export default function ForumPostPage() {
               <span className={`${styles.voteCount} ${(post.downvotes ?? 0) > 0 ? styles.voteCountNegative : ''}`}>{post.downvotes ?? 0}</span>
             </div>
 
-            <div className={styles.commentSectionHeader}>
-              <h3 className={styles.commentSectionTitle}>💬 评论</h3>
-              <button
-                className={`${styles.refreshBtn} ${refreshCooldown > 0 ? styles.refreshBtnCooling : ''}`}
-                onClick={handleRefreshComments}
-                disabled={refreshCooldown > 0}
-                title={refreshCooldown > 0 ? `${refreshCooldown}s 后可刷新` : '刷新评论'}
-              >
-                <FaIcon name="sync-alt" spin={spinning} />
-                {refreshCooldown > 0 && <span className={styles.refreshCooldown}>{refreshCooldown}s</span>}
-              </button>
-            </div>
-            <CommentSection
-              comments={unifiedComments}
-              onSubmit={handleNewComment}
-              onDelete={handleDeleteComment}
-              targetCommentId={scrollReady ? commentId : null}
-              scrollKey={scrollReady ? (requestKey ? requestKey.length : 0) : 0}
-              hideTitle
-            />
+            <CommentSection source="forum" targetId={postId} title="评论" />
           </div>
         )}
       </div>

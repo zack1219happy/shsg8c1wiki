@@ -1,21 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import FaIcon from '@/components/FaIcon'
 import { getSession } from '@/lib/auth'
 import type { UserSession } from '@/lib/auth'
 import {
   fetchWishById,
-  fetchWishComments,
-  addWishComment,
-  deleteWishComment,
   updateWishStatus,
 } from '@/lib/gist-api'
-import type { WishItem, WishComment } from '@/types/wishes'
+import type { WishItem } from '@/types/wishes'
 import { WISH_STATUS_MAP, WISH_TIER_MAP } from '@/types/wishes'
 import CommentSection from '@/components/CommentSection'
-import type { UnifiedComment } from '@/components/CommentSection'
 import WikiContent from '@/components/WikiContent'
 import { UserName } from '@/components/UserName'
 import { showWarningToast } from '@/lib/toast'
@@ -60,9 +56,6 @@ export default function WishPostPage() {
   // 记录最后一次完成加载的 id，用于推导 loading，避免在 effect 中同步 setState
   const [loadedId, setLoadedId] = useState<string | null>(null)
   const [session, setSession] = useState<UserSession | null>(null)
-  const [comments, setComments] = useState<WishComment[]>([])
-  const [refreshCooldown, setRefreshCooldown] = useState(0)
-  const [spinning, setSpinning] = useState(false)
 
   const loading = loadedId !== id
 
@@ -82,7 +75,6 @@ export default function WishPostPage() {
         if (cancelled) return
         setWish(w)
         setSession(s)
-        fetchWishComments(w.id).then(setComments).catch(() => {})
       } catch (e: unknown) {
         if (!cancelled) {
           setError((e as { message?: string } | null)?.message ?? null)
@@ -96,40 +88,6 @@ export default function WishPostPage() {
 
   // 绑定 userId 而非用户名，也不依赖 role
   const isAdmin = session && (session.role === 'admin' || session.role === 'super_admin')
-
-  const refreshComments = useCallback(async () => {
-    if (!wish) return
-    try { setComments(await fetchWishComments(wish.id)) } catch {}
-  }, [wish])
-
-  const handleNewComment = async (content: string, parentId?: string) => {
-    if (!wish) return
-    try {
-      await addWishComment(wish.id, content, parentId)
-      await refreshComments()
-    } catch (e: unknown) { showWarningToast((e as { message?: string } | null)?.message || '评论失败') }
-  }
-
-  const handleDeleteComment = async (commentId: string) => {
-    try {
-      await deleteWishComment(commentId)
-      await refreshComments()
-    } catch (e: unknown) { showWarningToast((e as { message?: string } | null)?.message || '删除失败') }
-  }
-
-  const handleRefreshComments = useCallback(async () => {
-    if (refreshCooldown > 0) return
-    setSpinning(true)
-    setRefreshCooldown(10)
-    await refreshComments()
-    setSpinning(false)
-    const timer = setInterval(() => {
-      setRefreshCooldown((prev) => {
-        if (prev <= 1) { clearInterval(timer); return 0 }
-        return prev - 1
-      })
-    }, 1000)
-  }, [refreshCooldown, refreshComments])
 
   const startEditStatus = () => {
     if (!wish) return
@@ -157,16 +115,6 @@ export default function WishPostPage() {
       setSubmittingStatus(false)
     }
   }
-
-  const unifiedComments = useMemo(() => comments.map((c): UnifiedComment => ({
-    id: c.id,
-    parentId: c.parent_id ?? null,
-    author: c.author_username,
-    authorId: c.author_id,
-    content: c.content,
-    createdAt: c.created_at,
-    deleted: c.deleted,
-  })), [comments])
 
   if (!id) return <div className={styles.page}><p className={styles.loading}>缺少需求标识</p></div>
   if (loading) return <div className={styles.page}><p className={styles.loading}>加载中…</p></div>
@@ -360,24 +308,7 @@ export default function WishPostPage() {
           {/* 分割线 → 讨论 */}
           <div className={styles.voteBar} style={{ borderBottom: '1px solid var(--color-border)', padding: '0 0 0' }} />
 
-          <div className={styles.commentSectionHeader}>
-            <h3 className={styles.commentSectionTitle}>💬 讨论</h3>
-            <button
-              className={`${styles.refreshBtn} ${refreshCooldown > 0 ? styles.refreshBtnCooling : ''}`}
-              onClick={handleRefreshComments}
-              disabled={refreshCooldown > 0}
-              title={refreshCooldown > 0 ? `${refreshCooldown}s 后可刷新` : '刷新评论'}
-            >
-              <FaIcon name="sync-alt" spin={spinning} />
-              {refreshCooldown > 0 && <span className={styles.refreshCooldown}>{refreshCooldown}s</span>}
-            </button>
-          </div>
-          <CommentSection
-            comments={unifiedComments}
-            onSubmit={handleNewComment}
-            onDelete={handleDeleteComment}
-            hideTitle
-          />
+          <CommentSection source="wish" targetId={wish.id} title="讨论" />
         </div>
       </div>
     </>

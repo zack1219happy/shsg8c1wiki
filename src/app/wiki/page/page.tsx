@@ -161,7 +161,7 @@ function WikiPageBySlug() {
 
         <WikiContent content={page.content} className="wiki-body" slug={slug} />
 
-        <CommentSection pageSlug={slug} />
+        <CommentSection source="wiki" targetId={slug} />
       </article>
 
       {headings.length > 0 && <TableOfContents headings={headings} />}

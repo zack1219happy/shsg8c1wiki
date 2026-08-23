@@ -51,3 +51,6 @@ agents/
 
 # electron-builder output
 release/
+
+# local agent session state
+.opencode/

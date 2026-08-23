@@ -14,9 +14,6 @@ import {
   votePlazaArticle,
   removePlazaVote,
   getUserPlazaVote,
-  fetchPlazaComments,
-  addPlazaComment,
-  deletePlazaComment,
   fetchPlazaCategories,
   awardPlazaArticlePoints,
   tipPlazaArticle,
@@ -30,9 +27,8 @@ import { loadPinyinInitialsFromDB } from '@/lib/people'
 import TableOfContents from '@/components/TableOfContents'
 import CommentSection from '@/components/CommentSection'
 import type { Heading } from '@/lib/content'
-import type { PlazaArticleDetail, PlazaComment, PlazaCategory, PlazaAPI } from '@/types/plaza'
+import type { PlazaArticleDetail, PlazaCategory, PlazaAPI } from '@/types/plaza'
 import { getCategoryPathById } from '@/types/plaza'
-import type { UnifiedComment } from '@/components/CommentSection'
 import { UserName } from '@/components/UserName'
 import { showWarningToast } from '@/lib/toast'
 import JSSafetyDialog from '@/components/JSSafetyDialog'
@@ -79,9 +75,6 @@ export default function PlazaArticlePage() {
   const [editIsPublic, setEditIsPublic] = useState(true)
   const [editHasJs, setEditHasJs] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [comments, setComments] = useState<PlazaComment[]>([])
-  const [refreshCooldown, setRefreshCooldown] = useState(0)
-  const [spinning, setSpinning] = useState(false)
   const [categories, setCategories] = useState<PlazaCategory[]>([])
   // JS 模式：null=待决定，'safe'=安全模式，'js'=原文模式
   const [jsMode, setJsMode] = useState<'safe' | 'js' | null>(null)
@@ -100,9 +93,8 @@ export default function PlazaArticlePage() {
         ])
         setArticle(a)
         setSession(s)
-        // 加载成功后拉评论 + 用户投票状态
+        // 加载成功后拉用户投票状态
         if (a) {
-          fetchPlazaComments(a.id).then(setComments).catch(() => {})
           getUserPlazaVote(a.id).then(setMyVote).catch(() => {})
         }
       } catch (e: unknown) {
@@ -367,15 +359,6 @@ export default function PlazaArticlePage() {
     }
   }
 
-  /** 局部刷新评论列表 */
-  const refreshComments = useCallback(async () => {
-    if (!article) return
-    try {
-      const c = await fetchPlazaComments(article.id)
-      setComments(c)
-    } catch {}
-  }, [article])
-
   /** 局部刷新文章（更新 comment_count 等） */
   const refreshArticle = useCallback(async () => {
     if (!slug) return
@@ -384,36 +367,6 @@ export default function PlazaArticlePage() {
       setArticle(a)
     } catch {}
   }, [slug])
-
-  const handleNewComment = async (content: string, parentId?: string) => {
-    if (!article) return
-    try {
-      await addPlazaComment(article.id, content, parentId)
-      await Promise.all([refreshComments(), refreshArticle()])
-    } catch (e: unknown) { showWarningToast(e instanceof Error && e.message ? e.message : '评论失败') }
-  }
-
-  const handleDeleteComment = async (commentId: string) => {
-    try {
-      await deletePlazaComment(commentId)
-      await Promise.all([refreshComments(), refreshArticle()])
-    } catch (e: unknown) { showWarningToast(e instanceof Error && e.message ? e.message : '删除失败') }
-  }
-
-  /** 手动刷新评论（10s 冷却） */
-  const handleRefreshComments = useCallback(async () => {
-    if (refreshCooldown > 0) return
-    setSpinning(true)
-    setRefreshCooldown(10)
-    await refreshComments()
-    setSpinning(false)
-    const timer = setInterval(() => {
-      setRefreshCooldown((prev) => {
-        if (prev <= 1) { clearInterval(timer); return 0 }
-        return prev - 1
-      })
-    }, 1000)
-  }, [refreshCooldown, refreshComments])
 
   // 提取标题用于 TOC（必须在早期 return 之前，保证 hooks 数量一致）
   const articleHtml = useMemo(() => {
@@ -428,16 +381,6 @@ export default function PlazaArticlePage() {
     () => extractHeadingsFromHtml(articleHtml),
     [articleHtml],
   )
-
-  const unifiedComments = useMemo(() => comments.map((c): UnifiedComment => ({
-    id: c.id,
-    parentId: c.parent_id ?? null,
-    author: c.author_username,
-    authorId: c.author_id,
-    content: c.content,
-    createdAt: c.created_at,
-    deleted: c.deleted,
-  })), [comments])
 
   if (!slug) return <div className={styles.page}><p className={styles.loading}>缺少文章标识</p></div>
   if (loading) return <div className={styles.page}><p className={styles.loading}>加载中…</p></div>
@@ -641,24 +584,7 @@ export default function PlazaArticlePage() {
             </div>
 
             {/* 评论区 */}
-            <div className={styles.commentSectionHeader}>
-              <h3 className={styles.commentSectionTitle}>💬 评论</h3>
-              <button
-                className={`${styles.refreshBtn} ${refreshCooldown > 0 ? styles.refreshBtnCooling : ''}`}
-                onClick={handleRefreshComments}
-                disabled={refreshCooldown > 0}
-                title={refreshCooldown > 0 ? `${refreshCooldown}s 后可刷新` : '刷新评论'}
-              >
-                <FaIcon name="sync-alt" spin={spinning} />
-                {refreshCooldown > 0 && <span className={styles.refreshCooldown}>{refreshCooldown}s</span>}
-              </button>
-            </div>
-            <CommentSection
-              comments={unifiedComments}
-              onSubmit={handleNewComment}
-              onDelete={handleDeleteComment}
-              hideTitle
-            />
+            <CommentSection source="plaza" targetId={article.id} title="评论" />
           </div>
         )}
       </div>

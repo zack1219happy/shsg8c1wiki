@@ -1,47 +1,55 @@
 'use client'
 
 import { supabase } from './supabase'
-import type { Comment, CommentsData, ForumPost, ForumComment, NotificationType, UserInfo } from '@/types/gist'
-import type { PlazaArticleDetail, PlazaArticleListResult, PlazaComment, PlazaCategory, PlazaTipRecord, SendPointsResult } from '@/types/plaza'
-import type { WishItem, WishComment } from '@/types/wishes'
+import type { ForumPost, NotificationType, UserInfo } from '@/types/gist'
+import type { PlazaArticleDetail, PlazaArticleListResult, PlazaCategory, PlazaTipRecord, SendPointsResult } from '@/types/plaza'
+import type { WishItem } from '@/types/wishes'
 
-function mapComment(raw: Record<string, unknown>): Comment {
+/* =============================================================
+   Comments API — 全站统一评论
+   五个板块（wiki 页面 / 论坛 / 广场 / 许愿 / 用户留言板）
+   共用同一张表、同一组 RPC、同一个组件。
+   ============================================================= */
+
+export type CommentSource = 'wiki' | 'forum' | 'plaza' | 'wish' | 'user_page'
+
+export interface UnifiedComment {
+  id: string
+  parentId: string | null
+  /** 用于删除权限判断的 userId。可为空（历史匿名数据），为空时仅 admin 可删 */
+  authorId?: string
+  author: string
+  content: string
+  createdAt: string
+  deleted: boolean
+}
+
+interface UnifiedCommentRow {
+  id: string
+  parent_id: string | null
+  author_id: string | null
+  author_username: string
+  content: string
+  created_at: string
+  deleted: boolean
+}
+
+export function toUnifiedComment(raw: UnifiedCommentRow): UnifiedComment {
   return {
-    id: raw.id as string,
-    page: raw.page as string,
-    author: raw.author as string,
-    content: raw.content as string,
-    date: raw.date as string,
-    parentId: raw.parent_id as string | undefined,
-    status: raw.status as 'pending' | 'approved' | 'rejected',
-    userId: raw.user_id as string | undefined,
-    authorColor: raw.author_color as string | undefined,
-    deleted: raw.deleted as boolean | undefined,
+    id: raw.id,
+    parentId: raw.parent_id ?? null,
+    authorId: raw.author_id ?? undefined,
+    author: raw.author_username,
+    content: raw.content,
+    createdAt: raw.created_at,
+    deleted: !!raw.deleted,
   }
 }
 
-export async function fetchPageComments(page: string): Promise<Comment[]> {
-  const { data, error } = await supabase.rpc('get_page_comments', { p_page: page })
-  if (error) throw new Error('查询失败: ' + error.message)
-  return ((data ?? []) as Record<string, unknown>[]).map(mapComment)
-}
-
-export async function fetchAllComments(): Promise<CommentsData> {
-  const { data, error } = await supabase.rpc('get_all_comments')
-  if (error) throw new Error('查询失败: ' + error.message)
-  const grouped: CommentsData = {}
-  for (const raw of data ?? []) {
-    const c = mapComment(raw as Record<string, unknown>)
-    if (!grouped[c.page]) grouped[c.page] = []
-    grouped[c.page].push(c)
-  }
-  return grouped
-}
-
-export async function fetchAllPageComments(page: string): Promise<Comment[]> {
-  const { data, error } = await supabase.rpc('get_all_page_comments', { p_page: page })
-  if (error) throw new Error('查询失败: ' + error.message)
-  return ((data ?? []) as Record<string, unknown>[]).map(mapComment)
+export async function fetchComments(source: CommentSource, targetId: string): Promise<UnifiedComment[]> {
+  const { data, error } = await supabase.rpc('get_comments', { p_source: source, p_target: targetId })
+  if (error) throw new Error('获取评论失败: ' + error.message)
+  return ((data ?? []) as UnifiedCommentRow[]).map(toUnifiedComment)
 }
 
 const RATE_LIMIT_KEY = 'wiki_comment_timestamps'
@@ -67,18 +75,29 @@ function checkRateLimit(): void {
   localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(recent))
 }
 
+/** 发表评论（客户端限流全站统一 60 条/小时） */
 export async function addComment(
-  page: string,
-  input: { author: string; content: string; parentId?: string },
-): Promise<void> {
+  source: CommentSource,
+  targetId: string,
+  content: string,
+  parentId?: string,
+): Promise<string> {
   checkRateLimit()
-  const { error } = await supabase.rpc('add_comment', {
-    p_page: page,
-    p_author: input.author.trim() || '匿名',
-    p_content: input.content.trim(),
-    p_parent_id: input.parentId || null,
+  const { data, error } = await supabase.rpc('add_comment', {
+    p_source: source,
+    p_target: targetId,
+    p_content: content.trim(),
+    p_parent_id: parentId || null,
   })
   if (error) throw new Error('提交失败: ' + error.message)
+  return data as string
+}
+
+/** 删除评论（作者/管理员可删；留言板主人可删本页留言） */
+export async function deleteComment(commentId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('delete_comment', { p_comment_id: commentId })
+  if (error) throw new Error('删除失败: ' + error.message)
+  return !!data
 }
 
 export interface Notification {
@@ -126,17 +145,6 @@ export async function deleteNotifications(type?: string): Promise<void> {
   } else {
     await supabase.rpc('delete_notifications')
   }
-}
-
-export async function deleteComment(commentId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('delete_comment', { p_comment_id: commentId })
-  if (error) throw new Error('删除失败: ' + error.message)
-  return !!data
-}
-
-export async function updateCommentStatus(id: string, status: 'pending' | 'approved' | 'rejected'): Promise<void> {
-  const { error } = await supabase.rpc('update_comment_status', { p_comment_id: id, p_status: status })
-  if (error) throw new Error('更新失败: ' + error.message)
 }
 
 /* =============================================================
@@ -194,26 +202,6 @@ export async function createForumPost(title: string, content: string, excludedVi
   return data as string
 }
 
-export async function fetchForumComments(postId: string): Promise<ForumComment[]> {
-  const { data, error } = await supabase.rpc('get_forum_comments', { p_post_id: postId })
-  if (error) throw new Error('获取评论失败: ' + error.message)
-  return ((data ?? []) as ForumComment[]).map((c: ForumComment) => ({ ...c, deleted: !!c.deleted }))
-}
-
-export async function addForumComment(
-  postId: string,
-  content: string,
-  parentId?: string,
-): Promise<string> {
-  const { data, error } = await supabase.rpc('add_forum_comment', {
-    p_post_id: postId,
-    p_content: content.trim(),
-    p_parent_id: parentId || null,
-  })
-  if (error) throw new Error('评论失败: ' + error.message)
-  return data as string
-}
-
 export async function voteForumPost(postId: string, voteType: 'up' | 'down'): Promise<void> {
   const { error } = await supabase.rpc('vote_forum_post', {
     p_post_id: postId,
@@ -242,12 +230,6 @@ export async function updateForumPost(postId: string, title: string, content: st
     p_agent_visible: agentVisible ?? null,
   })
   if (error) throw new Error('编辑失败: ' + error.message)
-}
-
-export async function deleteForumComment(commentId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('delete_forum_comment', { p_comment_id: commentId })
-  if (error) throw new Error('删除失败: ' + error.message)
-  return !!data
 }
 
 export async function togglePinForumPost(postId: string): Promise<boolean> {
@@ -468,36 +450,6 @@ export async function fetchLikedPlazaIds(): Promise<string[]> {
 }
 
 /* =============================================================
-   Plaza 评论区 API
-   ============================================================= */
-
-export async function fetchPlazaComments(articleId: string): Promise<PlazaComment[]> {
-  const { data, error } = await supabase.rpc('get_plaza_comments', { p_article_id: articleId })
-  if (error) throw new Error('获取评论失败: ' + error.message)
-  return ((data ?? []) as PlazaComment[]).map((c: PlazaComment) => ({ ...c, deleted: !!c.deleted }))
-}
-
-export async function addPlazaComment(
-  articleId: string,
-  content: string,
-  parentId?: string,
-): Promise<string> {
-  const { data, error } = await supabase.rpc('add_plaza_comment', {
-    p_article_id: articleId,
-    p_content: content.trim(),
-    p_parent_id: parentId || null,
-  })
-  if (error) throw new Error('评论失败: ' + error.message)
-  return data as string
-}
-
-export async function deletePlazaComment(commentId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('delete_plaza_comment', { p_comment_id: commentId })
-  if (error) throw new Error('删除失败: ' + error.message)
-  return !!data
-}
-
-/* =============================================================
    许愿池 API
    ============================================================= */
 
@@ -513,32 +465,6 @@ export async function fetchWishById(id: string): Promise<WishItem> {
   const rows = data as WishItem[]
   if (!rows || rows.length === 0) throw new Error('许愿不存在')
   return rows[0]
-}
-
-export async function fetchWishComments(wishId: string): Promise<WishComment[]> {
-  const { data, error } = await supabase.rpc('get_wish_comments', { p_wish_id: wishId })
-  if (error) throw new Error('获取评论失败: ' + error.message)
-  return ((data ?? []) as WishComment[]).map((c: WishComment) => ({ ...c, deleted: !!c.deleted }))
-}
-
-export async function addWishComment(
-  wishId: string,
-  content: string,
-  parentId?: string,
-): Promise<string> {
-  const { data, error } = await supabase.rpc('add_wish_comment', {
-    p_wish_id: wishId,
-    p_content: content.trim(),
-    p_parent_id: parentId || null,
-  })
-  if (error) throw new Error('评论失败: ' + error.message)
-  return data as string
-}
-
-export async function deleteWishComment(commentId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('delete_wish_comment', { p_comment_id: commentId })
-  if (error) throw new Error('删除失败: ' + error.message)
-  return !!data
 }
 
 /** 用积分支付许愿服务费 */
@@ -749,44 +675,4 @@ export async function rejectTagSubmission(id: string): Promise<{ success: boolea
   const { data, error } = await supabase.rpc('reject_tag_submission', { p_id: id })
   if (error) return { success: false, message: error.message }
   return (data ?? { success: false, message: '操作失败' }) as { success: boolean; message: string }
-}
-
-/* =============================================================
-   User Messages API — 用户主页留言板
-   ============================================================= */
-
-export interface UserMessage {
-  id: string
-  parent_id: string | null
-  author_id: string
-  author_username: string
-  content: string
-  created_at: string
-  deleted: boolean
-}
-
-export async function fetchUserMessages(targetUserId: string): Promise<UserMessage[]> {
-  const { data, error } = await supabase.rpc('get_user_messages', { p_target_user_id: targetUserId })
-  if (error) throw new Error('获取留言失败: ' + error.message)
-  return ((data ?? []) as UserMessage[]).map((c: UserMessage) => ({ ...c, deleted: !!c.deleted }))
-}
-
-export async function addUserMessage(
-  targetUserId: string,
-  content: string,
-  parentId?: string,
-): Promise<string> {
-  const { data, error } = await supabase.rpc('add_user_message', {
-    p_target_user_id: targetUserId,
-    p_content: content.trim(),
-    p_parent_id: parentId || null,
-  })
-  if (error) throw new Error('留言失败: ' + error.message)
-  return data as string
-}
-
-export async function deleteUserMessage(commentId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('delete_user_message', { p_comment_id: commentId })
-  if (error) throw new Error('删除失败: ' + error.message)
-  return !!data
 }

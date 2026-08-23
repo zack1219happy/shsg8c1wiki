@@ -23,6 +23,7 @@
     "@fortawesome/free-brands-svg-icons": "^7.3.0",
     "@fortawesome/free-solid-svg-icons": "^7.3.0",
     "@fortawesome/react-fontawesome": "^3.3.1",
+    "@letta-ai/letta-agent-sdk": "^0.7.4",
     "@supabase/supabase-js": "^2.110.1",
     "@uiw/react-codemirror": "^4.25.11",
     "dompurify": "^3.4.11",

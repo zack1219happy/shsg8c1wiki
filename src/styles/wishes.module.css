@@ -724,3 +724,23 @@
     align-self: stretch;
   }
 }
+
+/* ── 列表页状态提示与列表容器（此前缺失导致样式失效） ── */
+.loading,
+.error,
+.empty {
+  text-align: center;
+  padding: 48px 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.error {
+  color: #dc2626;
+}
+
+.wishList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

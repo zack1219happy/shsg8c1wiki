@@ -18,6 +18,53 @@
   margin-bottom: 20px;
 }
 
+/* ---------- 标题行 + 手动刷新 ---------- */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sectionHeader .title {
+  margin-bottom: 0;
+}
+
+.refreshBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 4px;
+  font-size: 0.82rem;
+  color: var(--color-text-light);
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+}
+
+.refreshBtn:hover:not(:disabled) {
+  color: var(--color-primary);
+}
+
+.refreshBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.refreshBtnCooling {
+  color: var(--color-primary);
+}
+
+.refreshCooldown {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.6em;
+  text-align: center;
+}
+
 /* ---------- 表单 ---------- */
 .form {
   display: flex;
