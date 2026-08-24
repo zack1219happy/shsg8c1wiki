@@ -16,6 +16,8 @@ interface UsePreviewOptions {
   onPreviewScroll?: (lineNumber: number) => void
   /** 标题→slug 映射，传入后启用 [[WikiLink]] 渲染 */
   titleSlugMap?: Record<string, string>
+  /** 文件名→图片 URL 映射（如 wiki _assets/ 的 base64），传入后预览渲染 DB 图片 */
+  assetsMap?: Record<string, string>
   /** 跳过 DOMPurify 净化（用于已启用 JS 的文章预览） */
   noSanitize?: boolean
 }
@@ -38,6 +40,7 @@ export function usePreview({
   content,
   onPreviewScroll,
   titleSlugMap: propMap,
+  assetsMap,
   noSanitize,
 }: UsePreviewOptions): UsePreviewReturn {
   const previewRef = useRef<HTMLDivElement | null>(null)
@@ -71,8 +74,16 @@ export function usePreview({
         `<pre class="hljs"><code class="language-sandbox">${escaped}</code></pre></div>`
       )
     })
-    return withSandbox
-  }, [content, effectiveMap, basePath, noSanitize])
+    // 替换 _assets/ 图片为传入的映射（DB base64 等）
+    let withAssets = withSandbox
+    if (assetsMap && Object.keys(assetsMap).length > 0) {
+      withAssets = withSandbox.replace(/src="([^"]*_assets\/([^"]+))"/g, (match: string, _src: string, file: string) => {
+        const hit = assetsMap[file] ?? assetsMap[decodeURIComponent(file)]
+        return hit ? `src="${hit}"` : match
+      })
+    }
+    return withAssets
+  }, [content, effectiveMap, basePath, noSanitize, assetsMap])
 
   // 滚动事件监听（scroll sync）
   useEffect(() => {

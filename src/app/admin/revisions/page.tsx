@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import FaIcon from '@/components/FaIcon'
@@ -17,6 +17,7 @@ import {
     rejectPageRequest,
     type WikiRevision,
     type RevisionDetail,
+    fetchPageAssets,
     type PageRequest,
     type PageRequestDetail,
 } from '@/lib/wiki-api'
@@ -39,6 +40,7 @@ export default function AdminRevisionsPage() {
 
     const [session] = useState(getSession())
     const isAdmin = !!session && ['admin', 'super_admin'].includes(session.role)
+    const [assetsMap, setAssetsMap] = useState<Record<string, string>>({})
 
     // ── 编辑修订审核流 ──
     const revisions = useReviewFlow<WikiRevision, RevisionDetail>({
@@ -63,6 +65,25 @@ export default function AdminRevisionsPage() {
         onSettled: () => router.replace('/admin/revisions?tab=requests'),
     })
     const { draft: prDraft, setDraft: setPrDraft, comment: prComment, setComment: setPrComment } = requests
+
+    // 详情加载后拉取 _assets/ 图片（预览面板渲染 DB 图片；沿父 slug 向上遍历，与 WikiContent 同规则）
+    useEffect(() => {
+        const slug = revisions.detail?.slug ?? requests.detail?.slug
+        if (!slug) return
+        let alive = true
+        const segments = slug.split('/')
+        ;(async () => {
+            const merged = new Map<string, string>()
+            for (let i = segments.length; i > 0; i--) {
+                try {
+                    const assets = await fetchPageAssets(segments.slice(0, i).join('/'))
+                    for (const [k, v] of assets) { if (!merged.has(k)) merged.set(k, v) }
+                } catch { /* 跳过 */ }
+            }
+            if (alive) setAssetsMap(Object.fromEntries(merged))
+        })()
+        return () => { alive = false }
+    }, [revisions.detail?.slug, requests.detail?.slug])
 
     // ── Diff（仅编辑修订）──
     const diffLines: DiffLine[] = useMemo(() => {
@@ -125,13 +146,13 @@ export default function AdminRevisionsPage() {
     //  渲染：审核管理
     // ==============================================================
     return (
-        <div className={styles.page}>
+        <div className={selectedId || prSelectedId ? `${styles.page} ${styles.pageWide}` : styles.page}>
             <div className={forumStyles.header}>
                 <h2><FaIcon name="gavel" /> 审核管理</h2>
             </div>
 
             {/* ── Tab 导航 ── */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid var(--color-border)', paddingBottom: 8 }}>
+            <div className={styles.tabNav}>
                 <TabButton active={tab !== 'requests'} onClick={() => switchTab('revisions')}>
                     <FaIcon name="pen" /> 编辑审核
                 </TabButton>
@@ -159,36 +180,39 @@ export default function AdminRevisionsPage() {
             )
 
             return (
-                <div style={{ display: 'flex', flexDirection: 'column', minHeight: '60vh' }}>
+                <div className={styles.detailWrap}>
                     {/* header */}
-                    <div className={forumStyles.detailHeader}>
-                        <div className={forumStyles.detailHeaderInner}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <h2 className={forumStyles.detailTitle}>
-                                        审核：{detail.page_title}
-                                        {detail.is_conflict && <span style={{ marginLeft: 10, fontSize: '0.9rem', color: '#c2410c' }}>⚠️ 冲突</span>}
-                                    </h2>
-                                    <div className={forumStyles.detailMeta}>
-                                        <UserName username={detail.author_username} userId={detail.author_id} />
-                                        <span>提交于 {formatTime(detail.created_at)}</span>
-                                        <span>基于 #{detail.base_revision}，当前 #{detail.current_revision}</span>
-                                    </div>
-                                </div>
-                                <button className={forumStyles.backBtnIcon} onClick={backToList} title="返回列表">
-                                    <FaIcon name="chevron-left" />
-                                </button>
+                    <div className={styles.reviewHeader}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <h2 className={styles.reviewTitle}>
+                                审核：{detail.page_title}
+                                {detail.is_conflict && <span className={styles.conflictTag}>⚠️ 基于旧版本</span>}
+                            </h2>
+                            <div className={styles.reviewMeta}>
+                                <UserName username={detail.author_username} userId={detail.author_id} />
+                                <span>提交于 {formatTime(detail.created_at)}</span>
+                                <span>基于 #{detail.base_revision}，当前 #{detail.current_revision}</span>
                             </div>
                         </div>
+                        <button className={styles.reviewBack} onClick={backToList} title="返回列表">
+                            <FaIcon name="chevron-left" />
+                        </button>
                     </div>
 
                     {/* 双栏编辑器 + Diff */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
                         <div className={styles.editorDiffLayout}>
                             <div className={styles.editorPane}>
-                                <MarkdownEditor value={revDraft.content} onChange={(v) => setRevDraft({ ...revDraft, content: v })} className={styles.editorInner} />
+                                <MarkdownEditor value={revDraft.content} onChange={(v) => setRevDraft({ ...revDraft, content: v })} className={styles.editorInner} assetsMap={assetsMap} />
                             </div>
                             <div className={styles.diffPane}>
+                                <div className={styles.diffPaneHead}>
+                                    <span>与当前版本的差异</span>
+                                    <span className={styles.diffStats}>
+                                        <span className={styles.diffStatsAdd}>+{diffLines.filter((l) => l.type === 'add').length}</span>
+                                        <span className={styles.diffStatsDel}>−{diffLines.filter((l) => l.type === 'del').length}</span>
+                                    </span>
+                                </div>
                                 <div className={styles.diffPaneBody} ref={diffRef}>
                                     {diffLines.length === 0 ? (
                                         <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-light)' }}>无差异</div>
@@ -284,46 +308,43 @@ export default function AdminRevisionsPage() {
             )
 
             return (
-                <div style={{ display: 'flex', flexDirection: 'column', minHeight: '60vh' }}>
+                <div className={styles.detailWrap}>
                     {/* header */}
-                    <div className={forumStyles.detailHeader}>
-                        <div className={forumStyles.detailHeaderInner}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <h2 className={forumStyles.detailTitle}>
-                                        审核新建页面：{detail.title}
-                                    </h2>
-                                    <div className={forumStyles.detailMeta}>
-                                        <UserName username={detail.author_username} userId={detail.author_id} />
-                                        <span>提交于 {formatTime(detail.created_at)}</span>
-                                        <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--color-primary)' }}>
-                                            /wiki/{detail.slug}
-                                        </span>
-                                    </div>
-                                </div>
-                                <button className={forumStyles.backBtnIcon} onClick={backToPrList} title="返回列表">
-                                    <FaIcon name="chevron-left" />
-                                </button>
+                    <div className={styles.reviewHeader}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <h2 className={styles.reviewTitle}>
+                                审核新建页面：{detail.title}
+                            </h2>
+                            <div className={styles.reviewMeta}>
+                                <UserName username={detail.author_username} userId={detail.author_id} />
+                                <span>提交于 {formatTime(detail.created_at)}</span>
+                                <span style={{ fontFamily: 'monospace', color: 'var(--color-primary)' }}>
+                                    /wiki/{detail.slug}
+                                </span>
                             </div>
                         </div>
+                        <button className={styles.reviewBack} onClick={backToPrList} title="返回列表">
+                            <FaIcon name="chevron-left" />
+                        </button>
                     </div>
 
                     {/* 编辑器 */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 12 }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'hidden' }}>
                         <input
                             className={forumStyles.titleInput}
                             type="text"
                             placeholder="页面标题"
                             value={prDraft.title}
                             onChange={(e) => setPrDraft({ ...prDraft, title: e.target.value })}
-                            style={{ fontSize: '0.95rem' }}
+                            style={{ fontSize: '0.95rem', flexShrink: 0 }}
                         />
 
-                        <div className={forumStyles.editorWrapper} style={{ minHeight: 300 }}>
+                        <div className={styles.prEditorWrap}>
                             <MarkdownEditor
                                 value={prDraft.content}
                                 onChange={(v) => setPrDraft({ ...prDraft, content: v })}
                                 className={forumStyles.editorNoBorder}
+                                assetsMap={assetsMap}
                             />
                         </div>
                     </div>
@@ -392,7 +413,7 @@ function ReviewActionBar({ comment, onCommentChange, onReject, onApprove, submit
     submitting: boolean
 }) {
     return (
-        <div style={{ display: 'flex', gap: 8, padding: '12px 0', alignItems: 'center' }}>
+        <div className={styles.actionBar}>
             <input
                 className={forumStyles.titleInput}
                 type="text"
@@ -416,22 +437,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     return (
         <button
             onClick={onClick}
-            style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 16px',
-                border: 'none',
-                borderRadius: 'var(--border-radius) var(--border-radius) 0 0',
-                fontSize: '0.88rem',
-                fontWeight: active ? 600 : 400,
-                cursor: 'pointer',
-                background: active ? 'var(--color-primary)' : 'transparent',
-                color: active ? '#fff' : 'var(--color-text-secondary)',
-                transition: 'background 0.15s, color 0.15s',
-                position: 'relative',
-                bottom: -9,
-            }}
+            className={`${styles.tabBtn} ${active ? styles.tabBtnActive : ''}`}
         >
             {children}
         </button>

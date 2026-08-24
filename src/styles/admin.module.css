@@ -7,6 +7,15 @@
   margin: 0 auto;
   padding: 76px 24px 60px;
   animation: fadeIn 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.pageWide {
+  max-width: none;
+  height: 100vh;
 }
 
 @keyframes fadeIn {
@@ -132,9 +141,10 @@
 .editorDiffLayout {
   display: grid;
   grid-template-columns: 2fr 1fr;
+  grid-template-rows: minmax(0, 1fr);
   gap: 0;
   flex: 1;
-  min-height: 300px;
+  min-height: 0;
 }
 
 .editorPane {
@@ -144,6 +154,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 /* MarkdownEditor 内层已有边框，去掉重复边框 */
@@ -158,6 +169,34 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+
+.diffPaneHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-hover-bg, rgba(0,0,0,0.02));
+  font-size: 0.78rem;
+  color: var(--color-text-light);
+  flex-shrink: 0;
+}
+
+.diffStats {
+  display: flex;
+  gap: 8px;
+  font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  font-weight: 700;
+}
+
+.diffStatsAdd {
+  color: #16a34a;
+}
+
+.diffStatsDel {
+  color: #dc2626;
 }
 
 .diffPaneBody {
@@ -183,6 +222,7 @@
 
 .diffLineAdd {
   background: #f0fdf4;
+  box-shadow: inset 3px 0 0 #16a34a;
 }
 
 .diffLineAdd:hover {
@@ -191,6 +231,7 @@
 
 .diffLineDel {
   background: #fef2f2;
+  box-shadow: inset 3px 0 0 #dc2626;
 }
 
 .diffLineDel:hover {
@@ -242,11 +283,162 @@
   font-size: 0.9rem;
 }
 
+/* ---- Tab 导航 ---- */
+
+.tabNav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tabBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+  font-size: 0.88rem;
+  font-weight: 400;
+  cursor: pointer;
+  background: transparent;
+  color: var(--color-text-secondary);
+  transition: background 0.15s, color 0.15s;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+}
+
+.tabBtn:hover {
+  color: var(--color-text);
+  background: var(--color-hover-bg, rgba(0,0,0,0.03));
+}
+
+.tabBtnActive {
+  font-weight: 600;
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  background: transparent;
+}
+
+.tabBtnActive:hover {
+  background: transparent;
+  color: var(--color-primary);
+}
+
+/* ---- 审核详情：一屏布局 ---- */
+
+.detailWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 420px;
+}
+
+.reviewHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  flex-shrink: 0;
+}
+
+.reviewTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.reviewMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: var(--color-text-light);
+  flex-wrap: wrap;
+}
+
+.conflictTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.reviewBack {
+  background: none;
+  border: none;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-text-light);
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.reviewBack:hover {
+  color: var(--color-primary);
+}
+
+/* 新建页面审核的编辑器区（单编辑器，无 diff） */
+
+.prEditorWrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+/* ---- 底部操作条 ---- */
+
+.actionBar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-bg);
+  flex-shrink: 0;
+}
+
 /* ---- 响应式 ---- */
 
 @media (max-width: 768px) {
   .page {
     padding: 16px 12px 0;
+  }
+
+  .detailWrap {
+    flex: none;
+    min-height: 0;
+  }
+
+  .page {
+    min-height: auto;
+  }
+
+  .pageWide {
+    height: auto;
   }
 
   .editorDiffLayout {

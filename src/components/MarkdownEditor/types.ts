@@ -120,6 +120,8 @@ export interface EditorProps {
   previewClassName?: string
   /** 标题→slug 映射，传入后预览面板启用 [[WikiLink]] 渲染 */
   titleSlugMap?: Record<string, string>
+  /** 文件名→图片 URL 映射（如 wiki _assets/ 的 base64），传入后预览面板渲染 DB 图片 */
+  assetsMap?: Record<string, string>
   /** 按 Ctrl+Enter 时触发（用于私信等场景的快捷发送） */
   onSubmit?: () => void
   /** 预览时跳过 DOMPurify 净化（用于已启用 JS 的文章） */

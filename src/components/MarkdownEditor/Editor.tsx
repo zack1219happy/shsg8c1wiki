@@ -23,6 +23,7 @@ export default function Editor({
   config,
   className,
   titleSlugMap,
+  assetsMap,
   onSubmit,
   noSanitizePreview,
   previewClassName,
@@ -130,6 +131,7 @@ export default function Editor({
         }
       : undefined,
     titleSlugMap,
+    assetsMap,
     noSanitize: noSanitizePreview,
   })
   useCodeCopy(previewRef)
