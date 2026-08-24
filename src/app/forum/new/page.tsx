@@ -35,7 +35,7 @@ export default function NewPostPage() {
         extraDraft: { excludedUserIds, agentVisible },
         onRestoreExtra: (draft) => {
             if (Array.isArray(draft.excludedUserIds)) setExcludedUserIds(draft.excludedUserIds as string[])
-            if ('agentVisible' in draft) setAgentVisible((draft.agentVisible as boolean) ?? false)
+            if ('agentVisible' in draft) setAgentVisible((draft.agentVisible as boolean) ?? true)
         },
         checkDuplicate: (title, content) => checkForumDuplicate(title, content),
         publish: (title, content) =>

@@ -115,7 +115,7 @@ export default function ForumPostPage() {
                 if (draft.title) setEditTitle(draft.title)
                 if (draft.content) setEditContent(draft.content)
                 if (draft.excludedUserIds) setEditExcludedIds(draft.excludedUserIds)
-                if ('agentVisible' in draft) setEditAgentVisible(draft.agentVisible ?? false)
+                if ('agentVisible' in draft) setEditAgentVisible(draft.agentVisible ?? true)
             }
         })()
         // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在挂载时恢复一次草稿
