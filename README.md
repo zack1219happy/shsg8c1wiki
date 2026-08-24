@@ -257,6 +257,11 @@ $$\int_a^b$$        ← 块级 LaTeX 公式
 > 警告内容...
 
 [!note] / [!warning] / [!success] / [!bug] 四种类型
+
+::::info[洛谷风格折叠框]   ← 标题后加 {open} 默认展开
+内容
+::::
+::::success / warning / error 四种类型，嵌套时每层多一个冒号
 ```
 
 ---
