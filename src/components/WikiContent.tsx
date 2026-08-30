@@ -39,7 +39,7 @@ type Segment = HtmlSegment | SandboxSegment
  * - 代码块复制按钮
  * - ```sandbox 块：安全模式→代码块，JS 模式→<iframe srcdoc>（组件级隔离，不参与 innerHTML）
  */
-export default function WikiContent({ content, format, className, titleSlugMap: propMap, slug, noSanitize }: Props) {
+export default function WikiContent({ content, format = 'markdown', className, titleSlugMap: propMap, slug, noSanitize }: Props) {
     const ref = useRef<HTMLDivElement>(null)
     const basePath = BASE_PATH
     const [assetMap, setAssetMap] = useState<Map<string, string> | null>(null)

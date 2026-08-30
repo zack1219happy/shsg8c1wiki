@@ -34,13 +34,32 @@ function createSeededRandom(seed: number) {
   }
 }
 
-/** 格式化为 YYYY-MM-DD（本地时间） */
+const SHANGHAI_TIME_ZONE = 'Asia/Shanghai'
+
+const shanghaiDateFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: SHANGHAI_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  weekday: 'short',
+})
+
+function getShanghaiDateParts(): { year: string; month: string; day: string; weekday: string } {
+  const parts = shanghaiDateFormatter.formatToParts(new Date())
+  const getPart = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? ''
+  return {
+    year: getPart('year'),
+    month: getPart('month'),
+    day: getPart('day'),
+    weekday: getPart('weekday'),
+  }
+}
+
+/** 格式化为 YYYY-MM-DD（上海时间） */
 export function todayStr(): string {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  const { year, month, day } = getShanghaiDateParts()
+  return `${year}-${month}-${day}`
 }
 
 // ── 考试/假日日期，从数据库加载 ──
@@ -89,8 +108,8 @@ export async function loadFortuneDatesFromDB(): Promise<void> {
  * 判断今天的领域（完全由数据库日期决定，无硬编码 fallback）
  */
 export function getTodayDomain(): FortuneDomain {
-  const now = new Date()
-  const mmdd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const { month, day, weekday } = getShanghaiDateParts()
+  const mmdd = `${month}-${day}`
 
   // 1. 考试日优先
   for (const d of fortuneDates) {
@@ -109,8 +128,7 @@ export function getTodayDomain(): FortuneDomain {
   }
 
   // 3. 周末
-  const dayOfWeek = now.getDay()
-  if (dayOfWeek === 0 || dayOfWeek === 6) return 'weekend'
+  if (weekday === 'Sun' || weekday === 'Sat') return 'weekend'
 
   // 4. 在校
   return 'school'

@@ -115,7 +115,7 @@ function renderName(username: string, color: string | null, gradientClipSupporte
     return (
       <span
         style={{
-          background: color,
+          backgroundImage: color,
           backgroundClip: 'text',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
