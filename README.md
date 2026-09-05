@@ -1,12 +1,12 @@
 # 🏫 上中二旦社区
 
-班级 Wiki，基于 Next.js 16 静态导出，部署于 GitHub Pages。
+班级社区，基于 Next.js 16 静态导出，部署于 GitHub Pages。
 
-这是一个超有梗超有活力的 Wiki！
+这是一个超有梗超有活力的社区！
 
-zack1219happy（[stu:wz]）是我们的创始人大大！
+zack1219happy（Zack-wz）是我们的创始人大大！
 
-从零到一搭起这个 Wiki 的框架，一个人默默写了整整一学期，没有他的坚持就不会有这个站。HTML、CSS、JavaScript 一把梭，所有东西都是他（用 DeepSeek）亲手敲出来的，代码力拉满。而且他不光技术好，还特别有耐心，把每个页面都调得细致又好看（谁知道跟没有多模态的 AI 交流前端有多费劲）。最关键的是，他永远欢迎大家一起参与，真正把 Wiki 做成了属于全班的知识库。感谢创始人大大，你是我们的超人 🦸‍♂️！！！
+从零到一搭起这个 Wiki （社区前身）的框架，一个人默默写了整整一学期，没有他的坚持就不会有这个站。HTML、CSS、JavaScript 一把梭，所有东西都是他（用 DeepSeek）亲手敲出来的，代码力拉满。而且他不光技术好，还特别有耐心，把每个页面都调得细致又好看（谁知道跟没有多模态的 AI 交流前端有多费劲）。最关键的是，他永远欢迎大家一起参与，真正把 Wiki 做成了属于全班的知识库。感谢创始人大大，你是我们的超人 🦸‍♂️！！！
 
 **在线访问：** https://zack1219happy.github.io/shsfdy2sq/
 
@@ -15,11 +15,6 @@ zack1219happy（[stu:wz]）是我们的创始人大大！
 ## 📖 目录
 
 - [我能做什么？](#-我能做什么)
-- [方式一：在 GitHub 网页上编辑（推荐新手）](#-方式一在-github-网页上编辑推荐新手)
-  - [编辑现有页面](#编辑现有页面)
-  - [创建新页面](#创建新页面)
-  - [上传图片](#上传图片)
-- [方式二：在本地编辑（推荐熟悉 Git 的人）](#-方式二在本地编辑推荐熟悉-git-的人)
 - [Markdown 速查](#-markdown-速查)
 - [Frontmatter 规则](#-frontmatter-规则)
 - [注意事项](#-注意事项)
@@ -28,190 +23,48 @@ zack1219happy（[stu:wz]）是我们的创始人大大！
 
 ## 🤔 我能做什么？
 
+### 主页
+
+打卡、看公告、随机 Wiki、看最新帖子。
+
+### Wiki
+
 | 你想做的事 | 难度 | 在哪里做 |
 |-----------|------|---------|
-| 修改正文错别字 / 补充内容 | ⭐ | GitHub 网页直接改 |
-| 创建新页面（如某位同学的个人页） | ⭐⭐ | GitHub 网页新建文件 |
-| 上传图片 | ⭐⭐ | GitHub 网页上传 |
-| 批量修改 / 添加大量内容 | ⭐⭐⭐ | 本地 Git 操作 |
+| 修改正文错别字 / 补充内容 | ⭐ | 点页面上的小铅笔 |
+| 创建新页面（如某位同学的个人页） | ⭐ | 戳左边栏的 '+' |
+| 上传图片 | ⭐ | 戳图床标签 |
+| 批量修改 / 添加大量内容 | ⭐ | 直接操作 |
 
----
+如果你之前看过这个 'readme.md' 会发现这里面有难度三颗星的项，多亏了 tqy 大佬才能使得直接网页编辑成为可能！
 
-## 🌐 方式一：在 GitHub 网页上编辑（推荐新手）
+### 讨论
 
-> ⚠️ **先登录 GitHub。** 点击右上角的 Sign in（登录）/Sign up（注册新账号）。
->
-> 你需要有一个邮箱。国内的就可以：163, 126, qq……
+可以发帖，记录一些碎碎念什么的，或全民公投。
 
-### 编辑现有页面
+### 文章
 
-**第 1 步：找到文件**
+发高质文章或脚本。
 
-1. 打开 https://github.com/zack1219happy/shsfdy2sq
-2. 点击 `data` 文件夹 → `contents` 文件夹
-3. 找到你要修改的 `.md` 文件（例如 `campus/dormitory.md`）
+### 私信
 
-**第 2 步：进入编辑模式**
+给某个人发私信。
 
-1. 点击文件右侧的 ✏️ **铅笔图标**（写着 "Edit this file"）
-2. 页面变成编辑模式，可以看到文件源码
+### 通知
 
-**第 3 步：修改内容**
+你会在这里收到别人的点赞、点踩、评论、投分等等。
 
-- 正文用 Markdown 语法（见下方速查）
-- 文件最顶上的 `---` 之间的内容是 **frontmatter**，不要随意删改
+### 用户
 
-**第 4 步：提交修改**
+有用户主页、积分明细、积分商城、名称装扮、用户设置。
 
-1. 往下翻到 **Commit changes** 区域
-2. 第一行写标题，例如 `fix: 修正宿舍楼描述`
-3. 下面可以写详细说明（可选）
-4. 选择 **"Create a new branch for this commit and start a pull request"**
-5. 点击绿色的 **Propose changes** 按钮
+### 许愿
 
-**第 5 步：创建 Pull Request**
+花费积分或 RMB 请 tqy 大佬写新功能！
 
-1. 页面跳转到 Pull Request 创建页
-2. 检查一下左边的 `base: main`，右边的 `compare:` 是你刚才新建的分支
-3. 确认 Changes 里显示了你改的内容
-4. 点击绿色的 **Create pull request** 按钮
-5. 等待管理员审核合并
+### 协议
 
----
-
-### 创建新页面
-
-**第 1 步：进入目标目录**
-
-1. 打开 https://github.com/zack1219happy/shsfdy2sq/tree/main/data/wiki
-2. 点进你要添加页面的分类目录（如 `people`、`campus`、`daily`）
-
-**第 2 步：新建文件**
-
-1. 点击右上角的 **Add file** → **Create new file**
-2. 在文件名输入框里写 `xxx.md`（例如 `zhang-san.md`）
-   - 文件名用英文小写、短横线连接（如 `computer-lab.md`）
-   - 不要用中文文件名
-
-**第 3 步：写内容**
-
-复制以下模板，粘贴到编辑区：
-
-```markdown
----
-title: 页面标题
-icon: fas fa-file-alt
----
-
-正文内容...
-```
-
-具体要求见下方 [Frontmatter 规则](#-frontmatter-规则)。
-
-**第 4 步：提交**
-
-同上，Commit → Create a new branch → Propose changes → Create pull request。
-
----
-
-### 上传图片
-
-**第 1 步：进入 _assets 目录**
-
-1. 打开你要放图片的分类目录（如 `campus`）
-2. 点进 `_assets` 文件夹（如果没有，在 `campus` 目录下新建 `_assets/` 文件夹）
-
-**第 2 步：上传**
-
-1. 点击 **Add file** → **Upload files**
-2. 把图片拖进去，或者点 "choose your files" 选择
-3. 在页面的 "Commit changes" 栏里写个说明
-4. 选择 **"Create a new branch"**
-5. 点击绿色的 **Propose changes**
-
-**第 3 步：在页面中引用**
-
-```markdown
-![图片描述](_assets/文件名.png)
-```
-
-图片和 `.md` 文件在同一目录层级时用这个路径。如果图片在子目录的 `_assets` 里，路径要对应好，例如：
-
-```markdown
-![宿舍布局](_assets/宿舍布局.png)
-```
-
-> ⚠️ 图片文件名会出现在 URL 中，建议用中文或英文命名都可以，但不要太长。
-
----
-
-## 💻 方式二：在本地编辑（推荐熟悉 Git 的人）
-
-### 环境要求
-
-- Node.js 22+
-- Git
-- npm
-
-### 第一步：克隆仓库
-
-```bash
-git clone https://github.com/zack1219happy/shsfdy2sq.git
-cd shsfdy2sq
-```
-
-### 第二步：创建新分支
-
-```bash
-git checkout -b my-edit-branch
-```
-
-### 第三步：修改内容
-
-所有内容文件在 `data/wiki/` 和 `data/agreement/` 目录下：
-
-```
-data/wiki/
-├── home.md              # 首页
-├── campus.md            # 校园分类页
-├── campus/map.md        # 校园地图
-├── campus/dormitory.md  # 宿舍
-├── campus/gym.md        # 体育馆
-├── campus/_assets/      # 校园相关的图片
-├── people/              # 人物
-└── daily/               # 日常
-
-data/agreement/          # 协议与帮助
-├── user-agreement.md    # 用户协议
-├── community-guidelines.md # 社区规范
-└── markdown-helper.md   # Markdown 帮助
-```
-
-### 第四步：本地预览
-
-```bash
-npm install
-npm run dev
-```
-
-打开 http://localhost:3000/shsfdy2sq/ 查看效果。
-
-### 第五步：提交并推送
-
-```bash
-git add .
-git commit -m "feat: 添加 xxx 页面"
-git push origin my-edit-branch
-```
-
-### 第六步：创建 Pull Request
-
-推送后终端会显示一个链接，点进去创建 PR。或者：
-
-1. 打开 https://github.com/zack1219happy/shsfdy2sq
-2. 点 **Pull requests** 标签 → 绿色的 **New pull request**
-3. 选 `base: main` ← `compare: my-edit-branch`
-4. 点 **Create pull request**
+一些重要的文档。
 
 ---
 
@@ -233,7 +86,7 @@ git push origin my-edit-branch
 [链接文字](https://example.com)
 [内部链接](/campus/dormitory)   ← 链接到本站其他页面
 
-![图片描述](_assets/文件名.png)
+![图片描述](图片链接（会在上传图床的时候自动填入）)
 
 > 引用
 
