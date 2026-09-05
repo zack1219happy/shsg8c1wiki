@@ -13,6 +13,7 @@
     "export": "node build_scripts/scan-icons.js && node build_scripts/generate-person-ts.js && cross-env EXPORT=true next build && node build_scripts/strip-katex-fonts.js && node build_scripts/copy-static.js",
     "start": "next start",
     "lint": "eslint .",
+    "test:e2e": "node node_modules/@playwright/test/cli.js test",
     "build:exe": "npm run export && electron-builder --win"
   },
   "dependencies": {

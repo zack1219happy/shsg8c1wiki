@@ -7,6 +7,7 @@ import FaIcon from '@/components/FaIcon'
 import WikiContent from '@/components/WikiContent'
 import { renderMarkdown, createMarkdown, extractHeadingsFromHtml, type Heading } from '@/lib/markdown'
 import { getSession, type UserSession } from '@/lib/auth'
+import { markNotificationsReadForPage } from '@/lib/api/notifications'
 import { awardPlazaArticlePoints, deletePlazaArticle, fetchPlazaArticle, fetchPlazaArticleTips, fetchPlazaCategories, getPlazaStorage, getUserPlazaVote, removePlazaVote, sendPlazaPoints, setPlazaStorage, tipPlazaArticle, updatePlazaArticle, votePlazaArticle } from '@/lib/api/plaza'
 import { fetchMyPoints } from '@/lib/api/points'
 import { formatDate } from '@/lib/forum'
@@ -87,6 +88,9 @@ export default function PlazaArticlePage() {
                 setSession(s)
                 // 加载成功后拉用户投票状态
                 if (a) {
+                    void markNotificationsReadForPage(`plaza/${slug}`)
+                        .then(() => window.dispatchEvent(new CustomEvent('new-notification')))
+                        .catch(() => {})
                     getUserPlazaVote(a.id).then((v) => setMyVote(v as "up" | "down" | null)).catch(() => {})
                 }
             } catch (e: unknown) {

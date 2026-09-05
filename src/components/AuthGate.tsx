@@ -6,6 +6,7 @@ import {
   getSession,
   login,
   clearSession,
+  clearStoredSession,
   tryRestoreSessionFromAuth,
   type UserSession,
 } from '@/lib/auth'
@@ -39,11 +40,37 @@ interface Props {
 
 export default function AuthGate({ children }: Props) {
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
-  // session 由 localStorage 初始化（getSession 内部已做 SSR 守卫）
-  const [session, setSession] = useState<UserSession | null>(() => getSession())
+  const [session, setSession] = useState<UserSession | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    tryRestoreSessionFromAuth().then(() => setSession(getSession()))
+    let active = true
+    const restore = async () => {
+      try {
+        await tryRestoreSessionFromAuth()
+      } catch {
+        clearSession()
+      } finally {
+        if (active) {
+          setSession(getSession())
+          setAuthChecked(true)
+        }
+      }
+    }
+    void restore()
+    return () => { active = false }
+  }, [])
+
+  // Supabase 会话在其他标签页退出或刷新失败时，立即同步页面状态。
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, authSession) => {
+      if (event === 'SIGNED_OUT' || !authSession) {
+        clearStoredSession()
+        setSession(null)
+        window.dispatchEvent(new CustomEvent('user-session-changed'))
+      }
+    })
+    return () => subscription.unsubscribe()
   }, [])
 
   // 定期检查封禁状态（30 秒一次），封禁中则自动退登
@@ -95,7 +122,7 @@ export default function AuthGate({ children }: Props) {
   // Realtime 订阅 + 浏览器通知（必须在条件 return 之前调用，保障 hooks 顺序）
   useBrowserNotifications(session?.userId ?? null)
 
-  if (!mounted) return null
+  if (!mounted || !authChecked) return null
   if (!session) return <LoginScreen onSuccess={handleLoginSuccess} />
 
   return (

@@ -3,6 +3,8 @@
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { BASE_PATH } from '@/lib/constants'
+import { fetchNotifications } from '@/lib/api/notifications'
+import { formatNotificationSummary } from '@/lib/notification-text'
 
 /**
  * 通知类型 → 通知标题映射
@@ -47,12 +49,21 @@ export function useBrowserNotifications(userId: string | null) {
         },
         (payload) => {
           const n = payload.new as {
+            id: string
             type: string
             excerpt: string | null
           }
           window.dispatchEvent(new CustomEvent('new-notification'))
           if (!document.hidden) return
-          showNotif(titleForType(n.type), n.excerpt || '您有一条新通知')
+          void fetchNotifications()
+            .then((items) => {
+              const current = items.find((item) => item.id === n.id)
+              showNotif(
+                titleForType(n.type),
+                current ? formatNotificationSummary(current) : (n.excerpt || '您有一条新通知'),
+              )
+            })
+            .catch(() => showNotif(titleForType(n.type), n.excerpt || '您有一条新通知'))
         },
       )
       .subscribe()

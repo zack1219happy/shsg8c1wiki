@@ -40,6 +40,9 @@ __icon_preview.html
 
 # local migration files (applied via Supabase API)
 *.sql
+!db/
+!db/migrations/
+!db/migrations/*.sql
 _scripts/
 
 # Echo agent runtime state

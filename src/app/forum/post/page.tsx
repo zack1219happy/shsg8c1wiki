@@ -8,6 +8,7 @@ import WikiContent from '@/components/WikiContent'
 import { renderMarkdown } from '@/lib/markdown'
 import { getSession } from '@/lib/auth'
 import { fetchForumPost, getUserForumVote, removeForumVote, updateForumPost, voteForumPost } from '@/lib/api/forum'
+import { markNotificationsReadForPage } from '@/lib/api/notifications'
 import { fetchAllUsers } from '@/lib/api/users'
 import CommentSection from '@/components/CommentSection'
 import VisibilityBar from '@/components/VisibilityBar'
@@ -62,6 +63,9 @@ export default function ForumPostPage() {
                 setPost(p)
                 setSession(s)
                 setMyVote(v as "up" | "down" | null)
+                void markNotificationsReadForPage(`forum/${postId}`)
+                    .then(() => window.dispatchEvent(new CustomEvent('new-notification')))
+                    .catch(() => {})
                 fetchAllUsers().then(setAllUsers).catch(() => {}).finally(() => setUsersLoading(false))
             })
             .catch((e: unknown) => setError(e instanceof Error ? e.message : null))

@@ -1,13 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { clearAllNotifications, deleteNotifications, fetchNotifications, markNotificationRead } from '@/lib/api/notifications'
 import { registry } from '@/data/person-registry'
 import { BASE_PATH } from '@/lib/constants'
+import { formatNotificationSummary, getNotificationTarget } from '@/lib/notification-text'
 import FaIcon from '@/components/FaIcon'
-import { UserName } from '@/components/UserName'
 import type { Notification } from '@/lib/api/notifications'
 import styles from '@/styles/auth.module.css'
 
@@ -63,6 +63,21 @@ export default function NoticePage() {
     window.dispatchEvent(new CustomEvent('new-notification'))
   }, [])
 
+  const handleNotificationClick = useCallback(async (
+    event: MouseEvent<HTMLAnchorElement>,
+    notification: Notification,
+    href: string | undefined,
+  ) => {
+    if (!href) return
+    event.preventDefault()
+    try {
+      await handleRead(notification.id)
+    } catch {
+      // 页面仍然应该可以打开；详情页加载时还会再次按目标内容标记已读。
+    }
+    window.location.assign(href)
+  }, [handleRead])
+
   const handleClearAll = useCallback(async () => {
     await clearAllNotifications(typeFilter ?? undefined)
     setNotifs((prev) =>
@@ -106,23 +121,26 @@ export default function NoticePage() {
             const basePath = BASE_PATH
             const page = n.page ? (registry.oldToNewSlug[n.page] ?? n.page) : undefined
             const pageKey = page ?? ''
-            // 通知指向的内容类型由 page 前缀决定 —— forum_reply / forum_own_post 既可能指向论坛帖子，也可能指向 plaza 文章
-            const isUser = pageKey.startsWith('user/')
-            const isForum = pageKey.startsWith('forum/')
-            const isPlaza = pageKey.startsWith('plaza/')
-            const isWish = pageKey.startsWith('wishes/')
+            // 兼容旧通知中的 forum/post?id=...、plaza/post?slug=... 格式。
+            const target = getNotificationTarget(pageKey)
+            const isUser = target?.kind === 'user'
+            const isForum = target?.kind === 'forum'
+            const isPlaza = target?.kind === 'plaza'
+            const isWish = target?.kind === 'wish'
             // wiki 审核通知的 page 带 'wiki/' 前缀，跳转前去掉
-            const wikiSlug = pageKey.startsWith('wiki/') ? pageKey.slice('wiki/'.length) : pageKey
-            const href = isUser
-              ? `${basePath}/user/mypage?user=${encodeURIComponent(pageKey.replace('user/', '') || '')}${n.comment_id ? '&comment=' + n.comment_id : ''}&_=${cacheBust}`
-              : isForum
-                ? `${basePath}/forum/post?id=${pageKey.replace('forum/', '') || ''}${n.comment_id ? '&comment=' + n.comment_id : ''}&_=${cacheBust}`
-                : isPlaza
-                  ? `${basePath}/plaza/post?slug=${encodeURIComponent(pageKey.replace('plaza/', '') || '')}${n.comment_id ? '&comment=' + n.comment_id : ''}&_=${cacheBust}`
-                  : isWish
-                    ? `${basePath}/wishes/post?id=${pageKey.replace('wishes/', '') || ''}${n.comment_id ? '&comment=' + n.comment_id : ''}&_=${cacheBust}`
+            const wikiSlug = target?.kind === 'wiki' ? target.key : pageKey
+            const commentQuery = n.comment_id ? '&comment=' + encodeURIComponent(n.comment_id) : ''
+            const cacheQuery = `&_=${cacheBust}`
+            const href = isUser && target
+              ? `${basePath}/user/mypage?user=${encodeURIComponent(target.key)}${commentQuery}${cacheQuery}`
+              : isForum && target
+                ? `${basePath}/forum/post?id=${encodeURIComponent(target.key)}${commentQuery}${cacheQuery}`
+                : isPlaza && target
+                  ? `${basePath}/plaza/post?slug=${encodeURIComponent(target.key)}${commentQuery}${cacheQuery}`
+                  : isWish && target
+                    ? `${basePath}/wishes/post?id=${encodeURIComponent(target.key)}${commentQuery}${cacheQuery}`
                     : wikiSlug
-                      ? `${basePath}/wiki/page?slug=${wikiSlug}${n.comment_id ? '&comment=' + n.comment_id : ''}&_=${cacheBust}`
+                      ? `${basePath}/wiki/page?slug=${encodeURIComponent(wikiSlug)}${commentQuery}${cacheQuery}`
                       : undefined
 
             let label = '评论'
@@ -151,14 +169,13 @@ export default function NoticePage() {
                 key={n.id}
                 className={`${styles.notifItem} ${n.read ? styles.notifRead : ''} ${isDeleted ? styles.notifDeleted : ''}`}
                 href={isDeleted ? undefined : href}
-                onClick={() => handleRead(n.id)}
+                onClick={(event) => handleNotificationClick(event, n, isDeleted ? undefined : href)}
                 style={isDeleted ? { pointerEvents: 'none' } : undefined}
               >
                 <span className={styles.notifFrom}>
-                  {n.from_username ? <UserName username={n.from_username} userId={n.from_user_id ?? undefined} /> : '匿名'}
                   <span className={styles.notifType}>{label}</span>
                 </span>
-                <span className={styles.notifText}>{n.excerpt ?? ''}</span>
+                <span className={styles.notifText}>{formatNotificationSummary(n)}</span>
               </a>
             )
           })}

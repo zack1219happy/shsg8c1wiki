@@ -1,0 +1,141 @@
+import type { NotificationType } from '@/types/gist'
+
+export interface NotificationSummaryInput {
+  from_username: string | null
+  page: string
+  excerpt: string | null
+  type: NotificationType
+  target_title: string | null
+}
+
+export type NotificationTargetKind = 'forum' | 'plaza' | 'wish' | 'wiki' | 'user'
+
+export interface NotificationTarget {
+  kind: NotificationTargetKind
+  key: string
+  canonicalPage: string
+}
+
+function clean(value: string | null | undefined): string {
+  return (value ?? '').replace(/\s+/g, ' ').trim()
+}
+
+function decode(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+/** 将新旧两种通知页面格式统一成详情页所需的目标。 */
+export function getNotificationTarget(page: string | null | undefined): NotificationTarget | null {
+  const value = clean(page)
+  if (!value) return null
+
+  if (value.startsWith('forum/post?id=')) {
+    const key = decode(value.slice('forum/post?id='.length))
+    return key ? { kind: 'forum', key, canonicalPage: `forum/${key}` } : null
+  }
+  if (value.startsWith('forum/')) {
+    const key = decode(value.slice('forum/'.length))
+    return key ? { kind: 'forum', key, canonicalPage: `forum/${key}` } : null
+  }
+
+  if (value.startsWith('plaza/post?slug=')) {
+    const key = decode(value.slice('plaza/post?slug='.length))
+    return key ? { kind: 'plaza', key, canonicalPage: `plaza/${key}` } : null
+  }
+  if (value.startsWith('plaza/')) {
+    const key = decode(value.slice('plaza/'.length))
+    return key ? { kind: 'plaza', key, canonicalPage: `plaza/${key}` } : null
+  }
+
+  if (value.startsWith('wishes/')) {
+    const key = decode(value.slice('wishes/'.length))
+    return key ? { kind: 'wish', key, canonicalPage: `wishes/${key}` } : null
+  }
+
+  if (value.startsWith('user/')) {
+    const key = decode(value.slice('user/'.length))
+    return key ? { kind: 'user', key, canonicalPage: `user/${key}` } : null
+  }
+
+  if (value.startsWith('wiki/')) {
+    const key = decode(value.slice('wiki/'.length))
+    return key ? { kind: 'wiki', key, canonicalPage: `wiki/${key}` } : null
+  }
+
+  return null
+}
+
+function targetNoun(target: NotificationTarget | null): string {
+  if (!target) return '内容'
+  if (target.kind === 'forum') return '帖子'
+  if (target.kind === 'plaza') return '文章'
+  if (target.kind === 'wish') return '许愿'
+  if (target.kind === 'wiki') return '页面'
+  return '主页'
+}
+
+function ensureContext(
+  message: string,
+  actor: string,
+  target: NotificationTarget | null,
+  title: string,
+): string {
+  let result = message
+  const alreadyDescribesTargetAction = Boolean(title && result.includes(title) && /投了|奖励|获得/.test(result))
+  if (!result.includes(actor) && !(actor !== '系统' && alreadyDescribesTargetAction)) {
+    result = `${actor}：${result}`
+  }
+  if (title && !result.includes(title)) {
+    result += `（${targetNoun(target)}《${title}》）`
+  }
+  return result
+}
+
+/**
+ * 生成通知中心展示的完整摘要。
+ * 旧通知的 excerpt 可能已经包含标题或发送人，因此这里只补缺失信息，避免重复拼接。
+ */
+export function formatNotificationSummary(notification: NotificationSummaryInput): string {
+  const actor = clean(notification.from_username) || '系统'
+  const message = clean(notification.excerpt) || '有新的通知'
+  const title = clean(notification.target_title)
+  const target = getNotificationTarget(notification.page)
+  const noun = targetNoun(target)
+  const titledTarget = title ? `${noun}《${title}》` : `你的${noun}`
+
+  switch (notification.type) {
+    case 'comment_reply':
+      return `${actor}${title ? `在${titledTarget}下` : ''}回复了你：${message}`
+    case 'page_owner':
+      return `${actor}${title ? `在${titledTarget}下` : ''}留言：${message}`
+    case 'user_message':
+      return `${actor}在你的主页留言：${message}`
+    case 'forum_reply':
+      return `${actor}在${titledTarget}下回复了你：${message}`
+    case 'wish_reply':
+      return `${actor}在${titledTarget}下回复了你：${message}`
+    case 'forum_like':
+      return `${actor}赞了你的${title ? `${noun}《${title}》` : noun}`
+    case 'plaza_like':
+      return `${actor}赞了你的文章${title ? `《${title}》` : ''}`
+    case 'wish_status_update':
+      return `${actor}更新了${titledTarget}：${message}`
+    case 'forum_post_update':
+      return `${actor}更新了你的${title ? `${noun}《${title}》` : noun}：${message}`
+    case 'plaza_tip':
+      return ensureContext(message, actor, target, title)
+    case 'forum_own_post':
+      if (target?.kind === 'plaza' || /奖励|获得|投了/.test(message)) {
+        return ensureContext(message, actor, target, title)
+      }
+      return `${actor}在${titledTarget}下发布了新动态：${message}`
+    case 'dm':
+      return `${actor}给你发来私信：${message}`
+    default:
+      return ensureContext(message, actor, target, title)
+  }
+}
