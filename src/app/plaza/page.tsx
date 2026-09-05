@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import FaIcon from '@/components/FaIcon'
 import { renderMarkdown } from '@/lib/markdown'
 import { getSession } from '@/lib/auth'
-import { fetchPlazaArticles, fetchPlazaCategories } from '@/lib/api/plaza'
+import { fetchPlazaCategories, fetchPlazaFeed } from '@/lib/api/plaza'
 import { formatDate } from '@/lib/forum'
-import type { PlazaArticleListResult, PlazaCategory } from '@/types/plaza'
+import type { PlazaArticleFeedItem, PlazaArticleListResult, PlazaCategory, PlazaCollectionFeedItem, PlazaFeedItem } from '@/types/plaza'
 import { UserName } from '@/components/UserName'
 import styles from '@/styles/forum.module.css'
 
@@ -20,7 +20,7 @@ import styles from '@/styles/forum.module.css'
 export default function PlazaListPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [articles, setArticles] = useState<PlazaArticleListResult[]>([])
+  const [items, setItems] = useState<PlazaFeedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -50,7 +50,7 @@ export default function PlazaListPage() {
     let cancelled = false
     const timer = setTimeout(() => {
       setLoading(true)
-      fetchPlazaArticles(
+      fetchPlazaFeed(
         categoryId || undefined,
         searchQuery.trim() || undefined,
         100,
@@ -60,7 +60,7 @@ export default function PlazaListPage() {
       )
         .then((data) => {
           if (cancelled) return
-          setArticles(data)
+          setItems(data)
         })
         .catch((e: Error) => { if (!cancelled) setError(e.message) })
         .finally(() => { if (!cancelled) setLoading(false) })
@@ -68,12 +68,26 @@ export default function PlazaListPage() {
     return () => { cancelled = true; clearTimeout(timer) }
   }, [categoryId, tab, searchQuery])
 
-  const displayArticles = articles
+  const displayItems = items
 
   const showSearch = searchOpen || searchQuery.length > 0
 
-  const goToArticle = useCallback((slug: string) => {
-    router.push('/plaza/post?slug=' + encodeURIComponent(slug))
+  const goToArticle = useCallback((article: PlazaArticleFeedItem) => {
+    const params = new URLSearchParams({ slug: article.slug })
+    if (article.collection_author_id && article.collection_prefix) {
+      params.set('from', 'collection')
+      params.set('collection_author_id', article.collection_author_id)
+      params.set('collection_prefix', article.collection_prefix)
+    }
+    router.push('/plaza/post?' + params.toString())
+  }, [router])
+
+  const goToCollection = useCallback((item: PlazaCollectionFeedItem) => {
+    const params = new URLSearchParams({
+      author_id: item.collection_author_id,
+      prefix: item.collection_prefix,
+    })
+    router.push('/plaza/collection?' + params.toString())
   }, [router])
 
   return (
@@ -104,7 +118,7 @@ export default function PlazaListPage() {
           />
           {searchQuery.trim() && (
             <span className={styles.searchCount}>
-              找到 {displayArticles.length} 条结果
+              找到 {displayItems.length} 条结果
             </span>
           )}
         </div>
@@ -112,20 +126,28 @@ export default function PlazaListPage() {
 
       {loading && <p className={styles.loading}>加载中…</p>}
       {error && <p className={styles.error}>❌ {error}</p>}
-      {!loading && !error && displayArticles.length === 0 && (
+      {!loading && !error && displayItems.length === 0 && (
         <p className={styles.empty}>
-          {searchQuery.trim() ? '没有找到匹配的文章' : '还没有文章，来发第一篇吧 ✍️'}
+          {searchQuery.trim() ? '没有找到匹配的文章或集锦' : '还没有文章，来发第一篇吧 ✍️'}
         </p>
       )}
 
-      {!loading && !error && displayArticles.length > 0 && (
+      {!loading && !error && displayItems.length > 0 && (
         <div className={styles.list}>
-          {displayArticles.map((article) => (
-            <ArticleCard
-              key={article.id}
-              article={article}
-              onClick={() => goToArticle(article.slug)}
-            />
+          {displayItems.map((item) => (
+            item.result_type === 'collection' ? (
+              <CollectionCard
+                key={item.collection_key}
+                collection={item}
+                onClick={() => goToCollection(item)}
+              />
+            ) : (
+              <ArticleCard
+                key={item.id}
+                article={item}
+                onClick={() => goToArticle(item)}
+              />
+            )
           ))}
         </div>
       )}
@@ -145,6 +167,7 @@ function ArticleCard({ article, onClick }: { article: PlazaArticleListResult; on
   return (
     <div
       className={styles.postCard}
+      data-plaza-result-type="article"
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -172,3 +195,33 @@ function ArticleCard({ article, onClick }: { article: PlazaArticleListResult; on
   )
 }
 
+function CollectionCard({ collection, onClick }: { collection: PlazaCollectionFeedItem; onClick: () => void }) {
+  return (
+    <div
+      className={styles.postCard}
+      data-plaza-result-type="collection"
+      data-collection-prefix={collection.collection_title}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter') onClick() }}
+    >
+      <div className={styles.postTitle}>
+        <span className={styles.collectionBadge}>集锦</span>
+        <span dangerouslySetInnerHTML={{ __html: renderMarkdown(collection.collection_title) }} />
+      </div>
+      <div className={styles.collectionLatestTitle}>
+        最新文章：<span dangerouslySetInnerHTML={{ __html: renderMarkdown(collection.collection_latest_article_title) }} />
+      </div>
+      <div className={styles.postMeta}>
+        <UserName
+          username={collection.collection_author_username}
+          userId={collection.collection_author_id}
+          className={styles.postAuthor}
+        />
+        <span>{collection.collection_article_count} 篇文章</span>
+        <span>更新于 {formatDate(collection.updated_at)}</span>
+      </div>
+    </div>
+  )
+}

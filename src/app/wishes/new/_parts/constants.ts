@@ -6,42 +6,73 @@ export interface ModelOption {
     emoji: string
     desc: string
     costNote: string | null
+    billing: 'weekly-quota' | 'free'
+    quotaMultiplier: number | null
 }
 
 // ── 模型选项 ──
 export const MODEL_OPTIONS: ModelOption[] = [
     {
-        value: 'flash',
-        label: 'DeepSeek V4 Flash',
-        emoji: '🔵',
-        desc: '默认，大多数需求够了，成本最低',
-        costNote: null,
+        value: 'luna',
+        label: 'GPT 5.6 Luna (Max)',
+        emoji: '🌙',
+        desc: '综合能力与速度均衡',
+        costNote: '周额度 ¥40，1% = ¥0.4；简单 0.1%～2%，中等 10%～20%',
+        billing: 'weekly-quota',
+        quotaMultiplier: 1,
     },
     {
-        value: 'v4-pro',
-        label: 'V4-Pro',
-        emoji: '🟣',
-        desc: '推理更强，成本 ×2',
-        costNote: null,
+        value: 'terra',
+        label: 'GPT 5.6 Terra (xHigh)',
+        emoji: '🌍',
+        desc: '推理能力更强，额度消耗更高',
+        costNote: '约为 Luna ×6；简单 0.6%～12%，中等 60%～120%',
+        billing: 'weekly-quota',
+        quotaMultiplier: 6,
     },
     {
-        value: 'glm-5.2',
-        label: 'GLM-5.2',
-        emoji: '🟢',
-        desc: '前端做得最好看，成本 ×10',
-        costNote: '⚠️ API 成本可能飙到几十块，建议设预算上限',
-    },
-    {
-        value: 'agens',
-        label: 'Agens',
-        emoji: '⚪',
-        desc: '几乎免费，但效率很低，不急再选',
-        costNote: '⏳ 预计交付时间会显著延长',
+        value: 'qwen-flash-next',
+        label: 'Qwen3.8 Flash Next (xHigh)',
+        emoji: '⚡',
+        desc: 'API 免费，适合不赶时间的需求',
+        costNote: 'API 免费；速度慢约 3 倍',
+        billing: 'free',
+        quotaMultiplier: null,
     },
 ]
 
 // ── 积分兑换 ──
 export const POINTS_PER_RMB = 200
+
+// ── API 额度计费 ──
+export const WEEKLY_QUOTA_RMB = 40
+export const RMB_PER_QUOTA_PERCENT = WEEKLY_QUOTA_RMB / 100
+
+type WishTier = 'small' | 'medium' | 'large'
+const LUNA_USAGE_RANGES: Record<'small' | 'medium', readonly [number, number]> = {
+    small: [0.1, 2],
+    medium: [10, 20],
+}
+
+function formatAmount(value: number): string {
+    return value.toFixed(2).replace(/\.?(0)+$/, '')
+}
+
+export function apiCostRangeForModel(modelValue: string, tier: WishTier): string {
+    const model = MODEL_OPTIONS.find((option) => option.value === modelValue) || MODEL_OPTIONS[0]
+    if (model.billing === 'free') return '免费'
+    // ASSUMPTION: 用户只提供了简单和中等任务的参考区间，大型任务显示按实际用量结算。
+    if (tier === 'large') return '按实际用量结算'
+
+    const baseRange = LUNA_USAGE_RANGES[tier]
+
+    const multiplier = model.quotaMultiplier || 1
+    const minPercent = baseRange[0] * multiplier
+    const maxPercent = baseRange[1] * multiplier
+    const minRmb = minPercent * RMB_PER_QUOTA_PERCENT
+    const maxRmb = maxPercent * RMB_PER_QUOTA_PERCENT
+    return `${formatAmount(minPercent)}%～${formatAmount(maxPercent)}%（约 ¥${formatAmount(minRmb)}～¥${formatAmount(maxRmb)}）`
+}
 
 export function serviceFeeToPoints(serviceFee: number): number {
     return Math.round(serviceFee * POINTS_PER_RMB)
@@ -72,16 +103,16 @@ export const Q2: Question = {
 }
 
 // ── 计算预估档位 ──
-export function estimateTier(scores: [number, number]): {
+export function estimateTier(scores: [number, number], modelValue = 'luna'): {
     tier: 'small' | 'medium' | 'large'
     tierLabel: string
     serviceFee: number
     apiCostRange: string
 } {
     const total = scores[0] + scores[1]
-    if (total <= 0) return { tier: 'small', tierLabel: '小功能', serviceFee: 0.5, apiCostRange: '≤ ¥1.5' }
-    if (total <= 2) return { tier: 'medium', tierLabel: '中级开发', serviceFee: 3, apiCostRange: '¥1.5 ~ ¥10' }
-    return { tier: 'large', tierLabel: '大型开发', serviceFee: 10, apiCostRange: '> ¥10' }
+    if (total <= 0) return { tier: 'small', tierLabel: '小功能', serviceFee: 0.5, apiCostRange: apiCostRangeForModel(modelValue, 'small') }
+    if (total <= 2) return { tier: 'medium', tierLabel: '中级开发', serviceFee: 3, apiCostRange: apiCostRangeForModel(modelValue, 'medium') }
+    return { tier: 'large', tierLabel: '大型开发', serviceFee: 10, apiCostRange: apiCostRangeForModel(modelValue, 'large') }
 }
 
 // ── 联系人类型 ──

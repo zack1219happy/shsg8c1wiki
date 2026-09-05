@@ -29,6 +29,8 @@ interface CommentSectionProps {
   title?: string
   /** 隐藏标题（宿主页面自带标题时用；刷新按钮仍保留） */
   hideTitle?: boolean
+  /** 嵌入宿主卡片时去掉评论区自身的上边距和分隔线 */
+  embedded?: boolean
   /**
    * 锚点重扫信号：该值变化时组件重新解析 URL 的 ?comment= 参数。
    * 同页导航（如 mypage 切换用户）时由宿主传入以触发重滚。
@@ -41,6 +43,7 @@ export default function CommentSection({
   targetId,
   title,
   hideTitle,
+  embedded,
   scrollKey = 0,
 }: CommentSectionProps) {
   const [comments, setComments] = useState<UnifiedComment[]>([])
@@ -143,7 +146,10 @@ export default function CommentSection({
   // ---- 渲染 ----
 
   return (
-    <section className={`${commentStyles.section} ${hideTitle ? commentStyles.sectionNoTitle : ''}`}>
+    <section
+      className={`${commentStyles.section} ${hideTitle ? commentStyles.sectionNoTitle : ''}`}
+      style={embedded ? { marginTop: 0, paddingTop: 0, borderTop: 'none' } : undefined}
+    >
       <div className={commentStyles.sectionHeader}>
         {!hideTitle && (
           <h2 className={commentStyles.title}>💬 {title ?? '评论区'}</h2>

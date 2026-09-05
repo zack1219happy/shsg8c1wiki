@@ -49,13 +49,11 @@ export function HomeTab({
             <BioSection isSelf={isSelf} bio={profile.bio} />
 
             <section className={styles.card}>
-                <h3 className={styles.cardTitle}>
-                    <FaIcon name="comments" /> 留言板
-                </h3>
                 <CommentSection
                     source="user_page"
                     targetId={profile.id}
-                    hideTitle
+                    title="留言板"
+                    embedded
                     scrollKey={commentAnchorKey}
                 />
             </section>

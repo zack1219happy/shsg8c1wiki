@@ -1,7 +1,7 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import FaIcon from '@/components/FaIcon'
 import { getSession } from '@/lib/auth'
 import { getPinyinInitials, loadPinyinInitialsFromDB } from '@/lib/people'
@@ -32,6 +32,7 @@ export default function UserMypagePage() {
 
 function UserMypage() {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [session] = useState<UserSession | null>(getSession())
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -55,32 +56,15 @@ function UserMypage() {
     const [activeTab, setActiveTab] = useState<Tab>('home')
     const [tabLoading, setTabLoading] = useState(false)
 
-    // 同步 URL query（与 DM 页相同模式，useSearchParams 在同页面导航时不可靠）
-    const [activeQuery, setActiveQuery] = useState('')
-    useEffect(() => {
-        const sync = () => setActiveQuery(window.location.search)
-        sync()
-        window.addEventListener('popstate', sync)
-        window.addEventListener('mypage-route-change', sync)
-        return () => {
-            window.removeEventListener('popstate', sync)
-            window.removeEventListener('mypage-route-change', sync)
-        }
-    }, [])
-    const urlUser = useMemo(() => {
-        // 优先从 activeQuery（事件驱动更新），首次渲染时可能为空，备选直读 URL
-        const q = activeQuery || (typeof window !== 'undefined' ? window.location.search : '')
-        return new URLSearchParams(q).get('user') || null
-    }, [activeQuery])
-
-    // 通知跳转锚点：URL 中 comment id → 滚动到对应留言
-    const urlCommentId = useMemo(() => {
-        const q = activeQuery || (typeof window !== 'undefined' ? window.location.search : '')
-        return new URLSearchParams(q).get('comment') || null
-    }, [activeQuery])
+    // 直接订阅 Next Router 的查询参数，确保同页 push/replace 和侧栏 Link 都能触发更新
+    const urlUser = searchParams.get('user') || null
+    const urlCommentId = searchParams.get('comment') || null
+    const queryString = searchParams.toString()
 
     // 防止重复加载
     const loadedUserRef = useRef('')
+    // 防止旧用户的异步请求在新用户页面上回写状态
+    const profileRequestIdRef = useRef(0)
 
     // 初始化 session
     useEffect(() => {
@@ -89,6 +73,8 @@ function UserMypage() {
     }, [router, session])
 
     const loadProfileData = useCallback(async (username: string) => {
+        const requestId = profileRequestIdRef.current + 1
+        profileRequestIdRef.current = requestId
         setLoading(true)
         setError('')
         // 重置 tab 数据
@@ -106,6 +92,7 @@ function UserMypage() {
                 loadPinyinInitialsFromDB(),
             ])
 
+            if (profileRequestIdRef.current !== requestId) return
             const p = (profileRes.data as UserProfile | null) ?? null
             if (!p) { setError('用户不存在'); setLoading(false); loadedUserRef.current = ''; return }
             setProfile(p)
@@ -126,6 +113,7 @@ function UserMypage() {
                 supabase.rpc('get_follow_state', { p_target_username: p.username }),
             ])
 
+            if (profileRequestIdRef.current !== requestId) return
             if (statsRes2.data) {
                 const d = statsRes2.data as Record<string, number>
                 setStats({
@@ -139,13 +127,15 @@ function UserMypage() {
             }
             // 从 points_transactions 表按日聚合积分（user_points_daily 表可能为空）
             const { data: txData } = await supabase.rpc('get_user_daily_points_from_tx', { p_user_id: uid, p_days: 14 })
+            if (profileRequestIdRef.current !== requestId) return
             if (txData) setDailyPoints((txData as { date: string; points: number }[]).map(d => ({ date: d.date.slice(5), points: d.points })))
             if (followRes2.data) setFollowState((followRes2.data as { state: FollowState }).state)
 
         } catch (e) {
+            if (profileRequestIdRef.current !== requestId) return
             setError(e instanceof Error ? e.message : '加载失败')
         }
-        setLoading(false)
+        if (profileRequestIdRef.current === requestId) setLoading(false)
     }, [])
 
     // URL 或 session 变化 → 加载数据
@@ -172,13 +162,17 @@ function UserMypage() {
     }, [urlUser, session, loadProfileData])
 
     const loadPosts = useCallback(async (username: string) => {
+        const requestKey = loadedUserRef.current
         const { data } = await supabase.rpc('get_user_forum_posts', { p_username: username, p_limit: 50, p_offset: 0 })
+        if (loadedUserRef.current !== requestKey) return
         if (data) setPosts(data as ForumPostItem[])
     }, [])
 
     const loadArticles = useCallback(async (username: string) => {
+        const requestKey = loadedUserRef.current
         try {
             const { data, error } = await supabase.rpc('get_user_plaza_articles', { p_username: username, p_limit: 50, p_offset: 0 })
+            if (loadedUserRef.current !== requestKey) return
             if (error) {
                 console.error('loadArticles error:', error)
                 return
@@ -190,10 +184,12 @@ function UserMypage() {
     }, [])
 
     const loadFollows = useCallback(async (username: string) => {
+        const requestKey = loadedUserRef.current
         const [fingRes, fersRes] = await Promise.all([
             supabase.rpc('get_user_following', { p_username: username }),
             supabase.rpc('get_user_followers', { p_username: username }),
         ])
+        if (loadedUserRef.current !== requestKey) return
         if (fingRes.data) setFollowing(fingRes.data as FollowUser[])
         if (fersRes.data) setFollowers(fersRes.data as FollowUser[])
     }, [])
@@ -287,7 +283,7 @@ function UserMypage() {
                             privacy={privacy}
                             onTogglePrivacy={togglePrivacy}
                             stats={stats}
-                            commentAnchorKey={urlCommentId ?? activeQuery}
+                            commentAnchorKey={urlCommentId ?? queryString}
                         />
                     )}
                     {activeTab === 'posts' && (

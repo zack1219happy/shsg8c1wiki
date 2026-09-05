@@ -8,7 +8,7 @@ import WikiContent from '@/components/WikiContent'
 import { renderMarkdown, createMarkdown, extractHeadingsFromHtml, type Heading } from '@/lib/markdown'
 import { getSession, type UserSession } from '@/lib/auth'
 import { markNotificationsReadForPage } from '@/lib/api/notifications'
-import { awardPlazaArticlePoints, deletePlazaArticle, fetchPlazaArticle, fetchPlazaArticleTips, fetchPlazaCategories, getPlazaStorage, getUserPlazaVote, removePlazaVote, sendPlazaPoints, setPlazaStorage, tipPlazaArticle, updatePlazaArticle, votePlazaArticle } from '@/lib/api/plaza'
+import { awardPlazaArticlePoints, deletePlazaArticle, fetchPlazaArticle, fetchPlazaArticleNavigation, fetchPlazaArticleTips, fetchPlazaCategories, getPlazaStorage, getUserPlazaVote, removePlazaVote, sendPlazaPoints, setPlazaStorage, tipPlazaArticle, updatePlazaArticle, votePlazaArticle } from '@/lib/api/plaza'
 import { fetchMyPoints } from '@/lib/api/points'
 import { formatDate } from '@/lib/forum'
 import { loadPinyinInitialsFromDB } from '@/lib/people'
@@ -17,7 +17,7 @@ import CommentSection from '@/components/CommentSection'
 import { PostDetailShell, VoteBar } from '@/components/PostDetail'
 import PointsAmountModal from '@/components/PointsAmountModal'
 import ToggleField from '@/components/ToggleField'
-import type { PlazaArticleDetail, PlazaCategory, PlazaAPI } from '@/types/plaza'
+import type { PlazaArticleDetail, PlazaArticleNavigation, PlazaCategory, PlazaAPI } from '@/types/plaza'
 import { getCategoryPathById } from '@/types/plaza'
 import { UserName } from '@/components/UserName'
 import { showWarningToast } from '@/lib/toast'
@@ -53,6 +53,9 @@ export default function PlazaArticlePage() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const slug = searchParams.get('slug') || ''
+    const fromCollection = searchParams.get('from') === 'collection'
+    const collectionAuthorId = searchParams.get('collection_author_id') || ''
+    const collectionPrefix = searchParams.get('collection_prefix') || ''
 
     const [article, setArticle] = useState<PlazaArticleDetail | null>(null)
     const [loading, setLoading] = useState(true)
@@ -66,6 +69,7 @@ export default function PlazaArticlePage() {
     const [editHasJs, setEditHasJs] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [categories, setCategories] = useState<PlazaCategory[]>([])
+    const [navigation, setNavigation] = useState<PlazaArticleNavigation | null>(null)
     // JS 模式：null=待决定，'safe'=安全模式，'js'=原文模式
     const [jsMode, setJsMode] = useState<'safe' | 'js' | null>(null)
     const [showDialog, setShowDialog] = useState(false)
@@ -80,6 +84,7 @@ export default function PlazaArticlePage() {
             try {
                 setLoading(true)
                 setError(null)
+                setNavigation(null)
                 const [a, s] = await Promise.all([
                     fetchPlazaArticle(slug),
                     getSession(),
@@ -88,6 +93,7 @@ export default function PlazaArticlePage() {
                 setSession(s)
                 // 加载成功后拉用户投票状态
                 if (a) {
+                    fetchPlazaArticleNavigation(a.id).then(setNavigation).catch(() => {})
                     void markNotificationsReadForPage(`plaza/${slug}`)
                         .then(() => window.dispatchEvent(new CustomEvent('new-notification')))
                         .catch(() => {})
@@ -291,6 +297,30 @@ export default function PlazaArticlePage() {
         }
     }
 
+    const collectionHref = useMemo(() => {
+        const authorId = collectionAuthorId || navigation?.collection_author_id || ''
+        const prefix = collectionPrefix || navigation?.collection_prefix || ''
+        if (!authorId || !prefix) return '/plaza'
+        const params = new URLSearchParams({
+            author_id: authorId,
+            prefix,
+        })
+        return '/plaza/collection?' + params.toString()
+    }, [collectionAuthorId, collectionPrefix, navigation])
+
+    const hasCollectionContext = fromCollection || navigation !== null
+
+    const goToNeighbor = useCallback((neighborSlug: string) => {
+        if (!navigation) return
+        const params = new URLSearchParams({
+            slug: neighborSlug,
+            from: 'collection',
+            collection_author_id: navigation.collection_author_id,
+            collection_prefix: navigation.collection_prefix,
+        })
+        router.push('/plaza/post?' + params.toString())
+    }, [navigation, router])
+
     // 提取标题用于 TOC（必须在早期 return 之前，保证 hooks 数量一致）
     const articleHtml = useMemo(() => {
         if (!article?.content) return ''
@@ -374,8 +404,8 @@ export default function PlazaArticlePage() {
                         )}
                         <button
                             className={pd.backBtnIcon}
-                            onClick={editing ? cancelEdit : () => router.push('/plaza')}
-                            title={editing ? '取消编辑' : '返回列表'}
+                            onClick={editing ? cancelEdit : () => router.push(hasCollectionContext ? collectionHref : '/plaza')}
+                            title={editing ? '取消编辑' : (hasCollectionContext ? '返回集锦' : '返回列表')}
                         >
                             <FaIcon name="chevron-left" />
                         </button>
@@ -440,6 +470,31 @@ export default function PlazaArticlePage() {
                             <div className={pd.detailBody}>
                                 <WikiContent content={article.content} className="wiki-body" noSanitize={jsMode === 'js'} format="markdown" />
                             </div>
+
+                            {navigation && (
+                                <div className={pd.articleNavigation} aria-label="集锦文章导航">
+                                    <button
+                                        className={pd.articleNavigationButton}
+                                        disabled={!navigation.previous_slug}
+                                        onClick={() => navigation.previous_slug && goToNeighbor(navigation.previous_slug)}
+                                    >
+                                        <span className={pd.articleNavigationLabel}>上一篇</span>
+                                        <span className={pd.articleNavigationTitle}>
+                                            {navigation.previous_title || '没有上一篇'}
+                                        </span>
+                                    </button>
+                                    <button
+                                        className={`${pd.articleNavigationButton} ${pd.articleNavigationNext}`}
+                                        disabled={!navigation.next_slug}
+                                        onClick={() => navigation.next_slug && goToNeighbor(navigation.next_slug)}
+                                    >
+                                        <span className={pd.articleNavigationLabel}>下一篇</span>
+                                        <span className={pd.articleNavigationTitle}>
+                                            {navigation.next_title || '没有下一篇'}
+                                        </span>
+                                    </button>
+                                </div>
+                            )}
 
                             {/* 点赞栏 + 投币入口 */}
                             <VoteBar

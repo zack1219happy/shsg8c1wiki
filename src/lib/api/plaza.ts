@@ -1,7 +1,16 @@
 'use client'
 
 import { supabase } from '../supabase'
-import type { PlazaArticleDetail, PlazaArticleListResult, PlazaCategory, PlazaTipRecord, SendPointsResult } from '@/types/plaza'
+import type {
+  PlazaArticleDetail,
+  PlazaArticleListResult,
+  PlazaArticleNavigation,
+  PlazaCategory,
+  PlazaCollectionDetail,
+  PlazaFeedItem,
+  PlazaTipRecord,
+  SendPointsResult,
+} from '@/types/plaza'
 
 /* =============================================================
    Plaza API — 文章广场
@@ -33,11 +42,178 @@ type PlazaArticleDetailRow = PlazaArticleDetail & {
   upvote_count?: number | null
 }
 
+type PlazaFeedRow = {
+  result_type: 'article' | 'collection'
+  id: string | null
+  title: string
+  slug: string | null
+  category_id: string | null
+  author_id: string
+  author_username: string
+  author_color: string | null
+  is_public: boolean | null
+  comment_count: number | null
+  upvote_count: number | null
+  downvote_count: number | null
+  created_at: string
+  updated_at: string
+  is_awarded: boolean | null
+  tip_count: number | null
+  has_js: boolean | null
+  collection_key: string | null
+  collection_prefix: string | null
+  collection_title: string | null
+  collection_article_count: number | null
+  collection_latest_article_title: string | null
+  collection_latest_article_slug: string | null
+}
+
+type PlazaCollectionRow = {
+  collection_key: string
+  collection_title: string
+  author_id: string
+  author_username: string
+  author_color: string | null
+  article_count: number
+  id: string
+  title: string
+  slug: string
+  category_id: string
+  is_public: boolean
+  comment_count: number
+  upvote_count: number
+  downvote_count: number
+  created_at: string
+  updated_at: string
+  is_awarded: boolean
+  tip_count: number
+  has_js: boolean
+}
+
+type PlazaArticleNavigationRow = PlazaArticleNavigation
+
 /** 获取所有分类（扁平列表，前端自行构建树结构） */
 export async function fetchPlazaCategories(): Promise<PlazaCategory[]> {
   const { data, error } = await supabase.rpc('get_plaza_categories')
   if (error) throw new Error('获取分类失败: ' + error.message)
   return (data ?? []) as PlazaCategory[]
+}
+
+/** 获取文章广场混合列表：普通文章 + 集锦卡片 */
+export async function fetchPlazaFeed(
+  categoryId?: string,
+  search?: string,
+  limit = 50,
+  offset = 0,
+  my?: boolean,
+  liked?: boolean,
+): Promise<PlazaFeedItem[]> {
+  const params: Record<string, string | number | boolean | null> = {
+    p_category_id: categoryId || null,
+    p_search: search || null,
+    p_limit: limit,
+    p_offset: offset,
+    p_my: my === true,
+    p_liked: liked === true,
+  }
+  const { data, error } = await supabase.rpc('get_plaza_feed', params)
+  if (error) throw new Error('获取文章广场失败: ' + error.message)
+
+  return ((data ?? []) as PlazaFeedRow[]).map((row): PlazaFeedItem => {
+    if (row.result_type === 'collection') {
+      return {
+        result_type: 'collection',
+        collection_key: row.collection_key ?? `${row.author_id}:${row.collection_title ?? ''}`,
+        collection_prefix: row.collection_prefix ?? row.collection_title ?? '',
+        collection_title: row.collection_title ?? row.title,
+        collection_author_id: row.author_id,
+        collection_author_username: row.author_username,
+        collection_author_color: row.author_color,
+        collection_article_count: row.collection_article_count ?? 0,
+        collection_latest_article_title: row.collection_latest_article_title ?? '',
+        collection_latest_article_slug: row.collection_latest_article_slug ?? '',
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      }
+    }
+
+    const isCollectionMember = Boolean(row.collection_key && row.collection_title && (row.collection_article_count ?? 0) >= 2)
+    return {
+      result_type: 'article',
+      id: row.id ?? '',
+      title: row.title,
+      slug: row.slug ?? '',
+      category_id: row.category_id ?? '',
+      author_id: row.author_id,
+      author_username: row.author_username,
+      author_color: row.author_color,
+      is_public: row.is_public ?? false,
+      comment_count: row.comment_count ?? 0,
+      like_count: row.upvote_count ?? 0,
+      downvote_count: row.downvote_count ?? 0,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      is_awarded: row.is_awarded ?? false,
+      tip_count: row.tip_count ?? 0,
+      ...(isCollectionMember
+        ? {
+            collection_author_id: row.author_id,
+            collection_prefix: row.collection_prefix ?? '',
+            collection_article_count: row.collection_article_count ?? 0,
+          }
+        : {}),
+    }
+  })
+}
+
+/** 获取一个集锦的全部可见文章 */
+export async function fetchPlazaCollection(authorId: string, prefix: string): Promise<PlazaCollectionDetail> {
+  const { data, error } = await supabase.rpc('get_plaza_collection', {
+    p_author_id: authorId,
+    p_prefix: prefix,
+  })
+  if (error) throw new Error('获取集锦失败: ' + error.message)
+
+  const rows = (data ?? []) as PlazaCollectionRow[]
+  if (rows.length === 0 || rows[0].article_count < 2) {
+    throw new Error('集锦不存在或没有可见文章')
+  }
+
+  const first = rows[0]
+  return {
+    collection_key: first.collection_key,
+    collection_title: first.collection_title,
+    author_id: first.author_id,
+    author_username: first.author_username,
+    author_color: first.author_color,
+    article_count: first.article_count,
+    articles: rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      slug: row.slug,
+      category_id: row.category_id,
+      author_id: row.author_id,
+      author_username: row.author_username,
+      author_color: row.author_color,
+      is_public: row.is_public,
+      comment_count: row.comment_count,
+      like_count: row.upvote_count,
+      downvote_count: row.downvote_count,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      is_awarded: row.is_awarded,
+      tip_count: row.tip_count,
+    })),
+  }
+}
+
+/** 获取当前文章所在集锦的上一篇/下一篇 */
+export async function fetchPlazaArticleNavigation(articleId: string): Promise<PlazaArticleNavigation | null> {
+  const { data, error } = await supabase.rpc('get_plaza_article_navigation', {
+    p_article_id: articleId,
+  })
+  if (error) return null
+  return ((data ?? []) as PlazaArticleNavigationRow[])[0] ?? null
 }
 
 export async function fetchPlazaArticles(

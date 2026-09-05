@@ -45,6 +45,56 @@ export interface PlazaComment {
 /** 文章列表返回类型（与 PlazaArticle 一致） */
 export type PlazaArticleListResult = PlazaArticle
 
+/** 广场混合列表项：普通文章或集锦 */
+export type PlazaFeedItem = PlazaArticleFeedItem | PlazaCollectionFeedItem
+
+export interface PlazaArticleFeedItem extends PlazaArticle {
+  result_type: 'article'
+  /** 搜索结果中的子文章回到所属集锦所需的上下文 */
+  collection_author_id?: string
+  collection_prefix?: string
+  collection_article_count?: number
+}
+
+export interface PlazaCollectionFeedItem {
+  result_type: 'collection'
+  collection_key: string
+  collection_prefix: string
+  collection_title: string
+  collection_author_id: string
+  collection_author_username: string
+  collection_author_color: string | null
+  collection_article_count: number
+  collection_latest_article_title: string
+  collection_latest_article_slug: string
+  created_at: string
+  updated_at: string
+}
+
+/** 集锦详情：按最新发布顺序排列的可见子文章 */
+export interface PlazaCollectionDetail {
+  collection_key: string
+  collection_title: string
+  author_id: string
+  author_username: string
+  author_color: string | null
+  article_count: number
+  articles: PlazaArticleListResult[]
+}
+
+/** 集锦内文章导航 */
+export interface PlazaArticleNavigation {
+  collection_key: string
+  collection_title: string
+  collection_author_id: string
+  collection_prefix: string
+  collection_article_count: number
+  previous_slug: string | null
+  previous_title: string | null
+  next_slug: string | null
+  next_title: string | null
+}
+
 /** 沙箱 JS getUserInfo() 返回值（未登录为 null） */
 export interface PlazaUserInfo {
   username: string

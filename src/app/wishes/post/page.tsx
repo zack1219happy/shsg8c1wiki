@@ -14,6 +14,7 @@ import WikiContent from '@/components/WikiContent'
 import { UserName } from '@/components/UserName'
 import { showWarningToast } from '@/lib/toast'
 import { formatDate } from '@/lib/forum'
+import { MODEL_OPTIONS } from '../new/_parts/constants'
 import styles from '@/styles/forum.module.css'
 import pd from '@/styles/post-detail.module.css'
 
@@ -32,6 +33,7 @@ const STATUS_OPTIONS = [
 ]
 
 const MODEL_EMOJI: Record<string, string> = {
+  ...Object.fromEntries(MODEL_OPTIONS.map((model) => [model.value, model.emoji])),
   flash: '🔵',
   'v4-pro': '🟣',
   'glm-5.2': '🟢',
@@ -39,6 +41,7 @@ const MODEL_EMOJI: Record<string, string> = {
 }
 
 const MODEL_LABEL: Record<string, string> = {
+  ...Object.fromEntries(MODEL_OPTIONS.map((model) => [model.value, model.label])),
   flash: 'DeepSeek V4 Flash',
   'v4-pro': 'V4-Pro',
   'glm-5.2': 'GLM-5.2',

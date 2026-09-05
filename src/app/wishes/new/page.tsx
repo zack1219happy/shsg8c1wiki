@@ -12,7 +12,8 @@ import WishForm from './_parts/WishForm'
 import PaymentPanel from './_parts/PaymentPanel'
 import {
     MODEL_OPTIONS, Q1, Q2,
-    POINTS_PER_RMB, serviceFeeToPoints, estimateTier,
+    POINTS_PER_RMB, RMB_PER_QUOTA_PERCENT, WEEKLY_QUOTA_RMB,
+    serviceFeeToPoints, estimateTier,
 } from './_parts/constants'
 import styles from '@/styles/wishes.module.css'
 
@@ -32,7 +33,7 @@ export default function WishingPoolPage() {
     const [description, setDescription] = useState('')
     const [contactType, setContactType] = useState(session ? 'dm' : 'wechat')
     const [contactDetail, setContactDetail] = useState('')
-    const [modelPref, setModelPref] = useState('flash')
+    const [modelPref, setModelPref] = useState('luna')
     const [extraMoney, setExtraMoney] = useState('')
     const [budgetCap, setBudgetCap] = useState('')
     // —— 流程状态 ——
@@ -61,7 +62,8 @@ export default function WishingPoolPage() {
         q2Idx !== null ? Q2.options[q2Idx].scores[1] : 0,
     ]
     const estimate = estimateTier(
-        (q1Idx !== null || q2Idx !== null) ? scores : [0, 0]
+        (q1Idx !== null || q2Idx !== null) ? scores : [0, 0],
+        modelPref,
     )
     const bothAnswered = q1Idx !== null && q2Idx !== null
 
@@ -151,11 +153,20 @@ export default function WishingPoolPage() {
                     <div className={styles.warningBox}>
                         <p><strong>⚠️ 开始之前先看清楚：</strong></p>
                         <ul>
-                            <li><strong>服务费 ≠ 全部费用</strong>。服务费是首付，除此之外还可能有：</li>
-                            <ul>
-                                <li><strong>API 成本</strong> —— 开发完按实际用量收，不赚差价。参考：小功能约 ¥1，大开发约 ¥20-30。</li>
-                                <li><strong>数据库月费 / 域名年费</strong> —— 如果功能需要单独的数据库或域名，我会给几个方案让你选，费用你自己承担。</li>
-                            </ul>
+                            <li>
+                                <strong>服务费 ≠ 全部费用</strong>。服务费是首付，除此之外还可能有：
+                                <ul>
+                                    <li>
+                                        <strong>API 成本</strong>：Luna 和 Terra 按实际周额度收取，每周 ¥{WEEKLY_QUOTA_RMB}，每 1% 计 ¥{RMB_PER_QUOTA_PERCENT}。
+                                        <ul>
+                                            <li>Luna：简单任务约 0.1%～2%（¥0.04～¥0.8），中等任务约 10%～20%（¥4～¥8）。</li>
+                                            <li>Terra：约为 Luna 的 6 倍，费用会随额度消耗增加。</li>
+                                            <li>Qwen3.8 Flash Next：API 免费，速度慢约 3 倍。</li>
+                                        </ul>
+                                    </li>
+                                    <li><strong>数据库月费 / 域名年费</strong> —— 如果功能需要单独的数据库或域名，我会给几个方案让你选，费用你自己承担。</li>
+                                </ul>
+                            </li>
                             <li><strong>需求写得越详细，做得越贴合你的想法</strong>，反复修改才烧钱。</li>
                             <li><strong>🐛 修 bug 免费</strong>，不需要走许愿池，直接站内私信我就行。</li>
                             <li><strong>加钱越多，同类需求排名越靠前</strong>。</li>
